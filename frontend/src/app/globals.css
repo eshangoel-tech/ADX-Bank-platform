@@ -1,0 +1,229 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Dark Harbour design tokens ─────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --bg-base: #060a12;
+  --bg-card: #0c1322;
+  --bg-elevated: #111b2e;
+
+  /* Borders */
+  --border-subtle: #162032;
+  --border-default: #1e3048;
+  --border-strong: #2a4060;
+
+  /* Primary accent — cyan */
+  --accent: #0891b2;
+  --accent-hover: #06b6d4;
+  --accent-muted: rgba(8, 145, 178, 0.12);
+  --accent-glow: rgba(8, 145, 178, 0.2);
+
+  /* Gold — balance amounts and premium moments ONLY */
+  --gold: #c9a84c;
+  --gold-muted: rgba(201, 168, 76, 0.1);
+
+  /* Text */
+  --text-primary: #cdd6e0;
+  --text-secondary: #7a8ba4;
+  --text-tertiary: #4a5b73;
+
+  /* Status */
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-dm-sans), system-ui, sans-serif;
+    /* Subtle dot-grid texture */
+    background-image: radial-gradient(circle, rgba(30, 48, 72, 0.4) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Respect reduced motion globally */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-subtle {
+    background-color: rgba(17, 27, 46, 0.6);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+
+  .input {
+    @apply w-full rounded-lg px-3 py-2.5 text-sm transition-colors;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    outline: none;
+  }
+  .input::placeholder { color: var(--text-tertiary); }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-muted);
+  }
+
+  .btn-primary {
+    @apply px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed;
+    background-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  .btn-primary:not(:disabled):hover {
+    background-color: var(--accent-hover);
+    box-shadow: 0 4px 18px rgba(8, 145, 178, 0.35);
+  }
+  .btn-primary:not(:disabled):active { filter: brightness(0.9); }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+  }
+  .btn-secondary:not(:disabled):hover {
+    border-color: var(--border-strong);
+    background-color: rgba(42, 64, 96, 0.3);
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:not(:disabled):hover {
+    color: var(--text-primary);
+    background-color: var(--bg-elevated);
+  }
+
+  .label {
+    @apply block text-sm font-medium mb-1.5;
+    color: var(--text-secondary);
+  }
+
+  .page-title {
+    @apply text-2xl font-bold mb-6;
+    font-family: var(--font-outfit), system-ui, sans-serif;
+    color: var(--text-primary);
+  }
+
+  /* Badges */
+  .badge-yellow {
+    @apply text-xs px-2.5 py-0.5 rounded-full font-semibold;
+    background: rgba(201, 168, 76, 0.12);
+    color: var(--gold);
+    border: 1px solid rgba(201, 168, 76, 0.3);
+  }
+  .badge-green {
+    @apply text-xs px-2.5 py-0.5 rounded-full font-semibold;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .badge-gray {
+    @apply text-xs px-2.5 py-0.5 rounded-full font-semibold;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+  }
+  .badge-red {
+    @apply text-xs px-2.5 py-0.5 rounded-full font-semibold;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .error-box {
+    @apply rounded-lg p-3 text-sm;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+  }
+}
+
+/* ── Balance hero card ──────────────────────────────────────────────────── */
+.balance-card {
+  background: linear-gradient(
+    135deg,
+    var(--bg-card) 0%,
+    #0d1829 40%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 200%;
+  animation: balance-shimmer 8s ease-in-out infinite;
+}
+
+/* ── Loan slider ────────────────────────────────────────────────────────── */
+.loan-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  background: var(--border-default);
+}
+.loan-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-base);
+  box-shadow: 0 0 8px var(--accent-glow);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.loan-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.loan-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-base);
+  box-shadow: 0 0 8px var(--accent-glow);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+/* ── Transfer success checkmark ─────────────────────────────────────────── */
+.success-circle {
+  stroke-dasharray: 157;
+  stroke-dashoffset: 157;
+  animation: draw-circle 0.5s ease-out forwards;
+}
+.success-check {
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: draw-check 0.35s ease-out 0.45s forwards;
+}
+
+/* ── Typing indicator dots ──────────────────────────────────────────────── */
+.typing-dot {
+  animation: dot-scale 0.6s ease-in-out infinite;
+}

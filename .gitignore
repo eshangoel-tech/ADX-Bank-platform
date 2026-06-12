@@ -1,0 +1,14 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.env
+.env.local
+chroma_data/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+postgres_data/
+redis_data/
