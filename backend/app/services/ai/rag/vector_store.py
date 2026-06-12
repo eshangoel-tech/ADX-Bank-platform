@@ -9,6 +9,7 @@ On startup the application calls `initialize_vector_store()` which:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,8 +28,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Persistent storage path (project root / chroma_data)
-_CHROMA_PATH = str(Path(__file__).parents[5] / "chroma_data")
+# /app/chroma_data in Docker (volume mount); override with CHROMA_PATH env var
+_CHROMA_PATH = os.getenv(
+    "CHROMA_PATH",
+    str(Path(__file__).parents[4] / "chroma_data"),  # parents[4] = /app in Docker
+)
 
 _COLLECTION_BANK_RULES = "bank_rules"
 _COLLECTION_BANK_POLICIES = "bank_policies"
@@ -90,19 +94,24 @@ def initialize_vector_store() -> None:
         (_COLLECTION_BANK_RULES, load_bank_rules_documents),
         (_COLLECTION_BANK_POLICIES, load_bank_policies_documents),
     ]:
-        # Delete if exists → recreate (ensures fresh embeddings every restart)
+        # Delete if exists → recreate for fresh embeddings every restart
         try:
             client.delete_collection(name)
             logger.info("Dropped existing collection '%s'.", name)
         except Exception:
             pass  # Collection didn't exist yet
 
-        collection = client.create_collection(
-            name=name,
-            metadata={"hnsw:space": "cosine"},
-        )
-        _collections[name] = collection
-        _ingest_documents(collection, loader())
+        try:
+            collection = client.create_collection(
+                name=name,
+                metadata={"hnsw:space": "cosine"},
+            )
+            _collections[name] = collection
+            _ingest_documents(collection, loader())
+        except Exception:
+            # Another Gunicorn worker won the creation race — reuse its collection
+            logger.info("Collection '%s' already created by another worker, reusing.", name)
+            _collections[name] = client.get_collection(name)
 
     logger.info("Vector store ready: %s", list(_collections.keys()))
 

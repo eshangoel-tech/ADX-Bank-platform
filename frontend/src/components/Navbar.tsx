@@ -24,6 +24,9 @@ export function Navbar() {
   };
 
   const isLanding = pathname === "/" || pathname === "/landing";
+  const isAuthPage = pathname === "/login" || pathname === "/register" || pathname?.startsWith("/verify");
+  const isDashboard = pathname === "/dashboard";
+  const showBack = isAuthenticated && !isDashboard && !isLanding && !isAuthPage;
 
   return (
     <motion.nav
@@ -40,11 +43,33 @@ export function Navbar() {
           : "1px solid transparent",
       }}
     >
-      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-3">
+        {/* Back button — inner pages only */}
+        {showBack && (
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+              (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg-elevated)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+              (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+            }}
+            aria-label="Back to dashboard"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
         {/* Logo */}
         <Link
           href={isAuthenticated ? "/dashboard" : "/"}
-          className="flex items-center gap-2.5 group"
+          className="flex items-center gap-2.5 group flex-1"
           aria-label="ADX Bank home"
         >
           <div
@@ -73,7 +98,7 @@ export function Navbar() {
         {isAuthenticated ? (
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer shrink-0"
             style={{ color: "var(--text-secondary)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.color = "var(--danger)";

@@ -1,11 +1,12 @@
 version: "3.9"
 
-# ── Shared env + computed connection strings ─────────────────────────────────
+# ── Shared env_file ──────────────────────────────────────────────────────────
+# NOTE: Don't put `environment:` here — per-service `environment:` blocks
+# completely replace (not merge) an anchor's `environment:`, silently
+# dropping DATABASE_URL and REDIS_URL. Keep env_file only; computed connection
+# strings go directly into each service's environment block below.
 x-backend-env: &backend-env
   env_file: .env
-  environment:
-    DATABASE_URL: postgresql+asyncpg://adx:${POSTGRES_PASSWORD:-adxpass}@postgres:5432/banking
-    REDIS_URL: redis://redis:6379/0
 
 # ── Services ──────────────────────────────────────────────────────────────────
 services:
@@ -57,6 +58,8 @@ services:
     volumes:
       - chroma_data:/app/chroma_data
     environment:
+      DATABASE_URL: postgresql+asyncpg://adx:${POSTGRES_PASSWORD:-adxpass}@postgres:5432/banking
+      REDIS_URL: redis://redis:6379/0
       GUNICORN_WORKERS: 2
 
   # ── Celery worker ────────────────────────────────────────────────────────────
@@ -75,6 +78,9 @@ services:
         condition: service_healthy
     volumes:
       - chroma_data:/app/chroma_data
+    environment:
+      DATABASE_URL: postgresql+asyncpg://adx:${POSTGRES_PASSWORD:-adxpass}@postgres:5432/banking
+      REDIS_URL: redis://redis:6379/0
 
   # ── Next.js frontend ─────────────────────────────────────────────────────────
   frontend:

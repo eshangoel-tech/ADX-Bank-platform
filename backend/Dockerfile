@@ -33,8 +33,11 @@ COPY --from=builder /install /install
 WORKDIR /app
 COPY . .
 
-# Non-root user for security
+# Non-root user for security.
+# Pre-create chroma_data so Docker copies its ownership into the named volume
+# on first mount — otherwise Docker creates the mountpoint as root.
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
+    && mkdir -p /app/chroma_data \
     && chown -R appuser:appgroup /app
 USER appuser
 

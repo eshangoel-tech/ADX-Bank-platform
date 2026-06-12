@@ -66,6 +66,10 @@ function TransferContent() {
 
   const handleInitiate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (method === "phone" && phone.length !== 10) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
