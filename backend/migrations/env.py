@@ -14,9 +14,16 @@ load_dotenv()
 
 config = context.config
 
+def _to_async_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    return url
+
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", _to_async_url(database_url))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
