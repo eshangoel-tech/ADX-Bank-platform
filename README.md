@@ -84,7 +84,7 @@ cd adx-bank-platform
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — fill in POSTGRES_PASSWORD, SECRET_KEY, and at least one AI key
+# Edit .env — fill in POSTGRES_PASSWORD, JWT_SECRET, and at least one AI key
 
 # 3. Run everything
 docker-compose up --build
