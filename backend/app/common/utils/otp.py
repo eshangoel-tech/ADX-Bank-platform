@@ -25,6 +25,8 @@ SMTP_USER: str = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@adxbank.com")
 SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "ADX Bank")
+# Port 465 → implicit SSL; port 587 → STARTTLS
+_SMTP_USE_SSL: bool = SMTP_PORT == 465
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # ---------------------------------------------------------------------------
@@ -79,14 +81,15 @@ def verify_otp_hash(otp: str, stored_hash: str) -> bool:
 # ---------------------------------------------------------------------------
 
 async def _send(msg: MIMEMultipart) -> None:
-    """Send a pre-built MIME message via SMTP STARTTLS."""
+    """Send a pre-built MIME message via SMTP. Port 465 uses SSL, 587 uses STARTTLS."""
     await aiosmtplib.send(
         msg,
         hostname=SMTP_HOST,
         port=SMTP_PORT,
         username=SMTP_USER or None,
         password=SMTP_PASSWORD or None,
-        start_tls=True,
+        use_tls=_SMTP_USE_SSL,
+        start_tls=not _SMTP_USE_SSL,
     )
 
 
