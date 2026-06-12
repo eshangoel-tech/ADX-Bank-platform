@@ -80,6 +80,9 @@ class User(Base):
 
     last_login_at = Column(DateTime(timezone=False), nullable=True)
 
+    # 6-digit PIN (bcrypt hash, nullable — set up after email verification)
+    pin_hash = Column(String(255), nullable=True)
+
     # Password reset fields
     reset_token_hash = Column(String(64), nullable=True, index=True)
     reset_token_expires_at = Column(DateTime(timezone=False), nullable=True)

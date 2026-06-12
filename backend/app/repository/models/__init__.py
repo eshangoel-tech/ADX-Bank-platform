@@ -15,6 +15,8 @@ from app.repository.models.transfer import Transfer
 from app.repository.models.chat_session import ChatSession
 from app.repository.models.chat_response import ChatResponse
 from app.repository.models.llm_interaction import LLMInteraction
+from app.repository.models.notification import Notification
+from app.repository.models.payment_request import PaymentRequest
 
 __all__ = [
     "User",
@@ -33,4 +35,6 @@ __all__ = [
     "ChatSession",
     "ChatResponse",
     "LLMInteraction",
+    "Notification",
+    "PaymentRequest",
 ]

@@ -69,12 +69,15 @@ class UserRepository:
         *,
         phone: Optional[str] = None,
         address: Optional[dict] = None,
+        salary=None,
     ) -> None:
         values: dict = {}
         if phone is not None:
             values["phone"] = phone
         if address is not None:
             values["address"] = address
+        if salary is not None:
+            values["salary"] = salary
         if values:
             await db.execute(
                 update(User).where(User.id == user_id).values(**values)

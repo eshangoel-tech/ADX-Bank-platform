@@ -100,6 +100,26 @@ class TransactionListResponse(BaseModel):
 class UpdateProfileRequest(BaseModel):
     address: Optional[AddressSchema] = None
     phone: Optional[str] = Field(None, min_length=6, max_length=20)
+    salary: Optional[Decimal] = Field(None, ge=0, description="Monthly salary in INR")
+
+
+class SetupPinRequest(BaseModel):
+    new_pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+    confirm_pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+    def model_post_init(self, __context) -> None:
+        if self.new_pin != self.confirm_pin:
+            raise ValueError("PINs do not match")
+
+
+class ChangePinRequest(BaseModel):
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+    confirm_pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+    def model_post_init(self, __context) -> None:
+        if self.new_pin != self.confirm_pin:
+            raise ValueError("PINs do not match")
 
 
 class UpdateProfileResponse(BaseModel):

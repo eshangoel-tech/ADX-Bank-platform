@@ -14,18 +14,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.utils.exceptions import (
     account_not_active,
     invalid_otp,
+    invalid_pin,
     max_otp_attempts,
     not_found,
     otp_expired,
+    pin_not_set,
     topup_not_found,
 )
 from app.common.utils.otp import generate_otp, hash_otp, send_otp_email, verify_otp_hash
+from app.common.utils.pin import verify_pin
 from app.config.redis import get_redis
 from app.config.bank_rules import ADD_MONEY_MAX_AMOUNT, ADD_MONEY_REDIS_TTL_SECONDS
 from app.repository.core.wallet_repository.repository import WalletRepository
 from app.repository.models.audit_log import AuditLog
 from app.repository.models.otp_verification import OtpVerification
 from app.repository.models.user import User
+from app.services.core.notification_service.service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -226,9 +230,89 @@ class WalletService:
                 },
             )
         )
+        await NotificationService.create(
+            db, user_id=user.id, type="CREDIT",
+            title=f"₹{amount:,.0f} added to account",
+            body=f"Your ADX account has been topped up. New balance: ₹{new_balance:,.0f}",
+            metadata={"topup_id": str(topup_id), "amount": str(amount)},
+        )
         await db.commit()
 
         # -- Remove Redis key (idempotency guard — can't reuse this topup_id)
+        redis.delete(self._redis_key(topup_id))
+
+        return {
+            "amount_credited": str(amount),
+            "new_balance": str(new_balance),
+            "currency": "INR",
+        }
+
+    # ------------------------------------------------------------------
+    # Step 2 (PIN path): confirm add-money with PIN instead of OTP
+    # ------------------------------------------------------------------
+
+    async def confirm_add_money_pin(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        session_id: UUID,
+        topup_id: UUID,
+        pin: str,
+    ) -> dict:
+        if not user.pin_hash:
+            raise pin_not_set()
+
+        if not verify_pin(pin, user.pin_hash):
+            raise invalid_pin()
+
+        # Fetch top-up context from Redis
+        redis = get_redis()
+        raw = redis.get(self._redis_key(topup_id))
+        if raw is None:
+            raise topup_not_found()
+
+        ctx = json.loads(raw)
+        amount = Decimal(ctx["amount"])
+        account_id = UUID(ctx["account_id"])
+
+        # Verify it belongs to this user
+        if ctx["user_id"] != str(user.id):
+            raise topup_not_found()
+
+        account = await self.repo.get_account_for_update(db, account_id)
+        if account is None:
+            raise not_found("Account")
+
+        new_balance = await self.repo.credit_account_balance(db, account_id, amount)
+
+        await self.repo.create_ledger_entry(
+            db,
+            account_id=account_id,
+            entry_type="CREDIT",
+            amount=amount,
+            balance_after=new_balance,
+            reference_type="ADD_MONEY",
+            reference_id=topup_id,
+            description=f"Wallet top-up of ₹{amount}",
+        )
+
+        db.add(
+            self._audit(
+                user_id=user.id,
+                session_id=session_id,
+                event_type="ADD_MONEY_SUCCESS",
+                metadata={"topup_id": str(topup_id), "amount_credited": str(amount), "method": "PIN"},
+            )
+        )
+        await NotificationService.create(
+            db, user_id=user.id, type="CREDIT",
+            title=f"₹{amount:,.0f} added to account",
+            body=f"Your ADX account has been topped up. New balance: ₹{new_balance:,.0f}",
+            metadata={"topup_id": str(topup_id), "amount": str(amount)},
+        )
+        await db.commit()
+
         redis.delete(self._redis_key(topup_id))
 
         return {

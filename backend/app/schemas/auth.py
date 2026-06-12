@@ -32,6 +32,7 @@ class VerifyEmailResponse(BaseModel):
     status: str
     account_id: str
     account_number: str
+    setup_token: str  # short-lived JWT for PIN setup only
 
 
 class StandardResponse(BaseModel):
@@ -51,6 +52,11 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=128)
 
 
+class LoginResponse(BaseModel):
+    """Returned from POST /auth/login — tells frontend whether PIN option is available."""
+    has_pin: bool
+
+
 # ---------------------------------------------------------------------------
 # Login (step 2 — OTP verification)
 # ---------------------------------------------------------------------------
@@ -64,6 +70,16 @@ class VerifyLoginOTPResponse(BaseModel):
     access_token: str
     token_type: str
     session_id: str
+
+
+# ---------------------------------------------------------------------------
+# Login (step 2 — PIN path)
+# ---------------------------------------------------------------------------
+
+class LoginWithPinRequest(BaseModel):
+    identifier: str = Field(..., min_length=1, max_length=150)
+    password: str = Field(..., min_length=1, max_length=128)
+    pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 # ---------------------------------------------------------------------------

@@ -112,6 +112,16 @@ async def _do_joining_bonus(user_id: UUID, account_id: UUID) -> None:
                 )
             )
 
+            # In-app notification
+            from app.repository.models.notification import Notification
+            db.add(Notification(
+                user_id=user_id,
+                type="CREDIT",
+                title=f"₹{_JOINING_BONUS:,.0f} joining bonus credited!",
+                body="Welcome to ADX Bank! Your joining bonus has been added to your account.",
+                metadata_={"amount": str(_JOINING_BONUS)},
+            ))
+
             # Load user for email — capture values as primitives before session closes
             user_res = await db.execute(select(User).where(User.id == user_id))
             user = user_res.scalar_one_or_none()
@@ -252,6 +262,16 @@ async def _do_salary_credit(user_id: UUID, account_id: UUID) -> None:
                     },
                 )
             )
+
+            # In-app notification
+            from app.repository.models.notification import Notification
+            db.add(Notification(
+                user_id=user_id,
+                type="SALARY",
+                title=f"Salary ₹{salary:,.0f} credited",
+                body=f"Your monthly salary of ₹{salary:,.0f} has been credited to your account.",
+                metadata_={"amount": str(salary)},
+            ))
         # session committed and closed here — do NOT access ORM objects below
 
     logger.info(

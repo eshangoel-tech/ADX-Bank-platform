@@ -8,6 +8,8 @@ from app.repository.session import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
+    LoginResponse,
+    LoginWithPinRequest,
     RegisterRequest,
     RegisterResponse,
     ResetPasswordRequest,
@@ -68,8 +70,28 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService()
-    await service.login_user(db, identifier=payload.identifier, password=payload.password)
-    return ok_response(request, "Login OTP sent to registered email.")
+    result = await service.login_user(db, identifier=payload.identifier, password=payload.password)
+    data = LoginResponse(**result).model_dump()
+    return ok_response(request, "Login OTP sent to registered email.", data=data)
+
+
+@router.post("/login-pin")
+async def login_with_pin(
+    request: Request,
+    payload: LoginWithPinRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService()
+    out = await service.login_with_pin(
+        db,
+        identifier=payload.identifier,
+        password=payload.password,
+        pin=payload.pin,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    data = VerifyLoginOTPResponse(**out).model_dump()
+    return ok_response(request, "Login successful.", data=data)
 
 
 @router.post("/verify-login-otp")

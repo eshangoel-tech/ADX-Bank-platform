@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.utils.exceptions import (
     invalid_credentials,
     invalid_otp,
+    invalid_pin,
     max_otp_attempts,
     otp_expired,
+    pin_not_set,
     token_expired,
     token_invalid,
     user_already_exists,
@@ -31,6 +33,7 @@ from app.common.utils.security import (
     hash_token,
     verify_password,
 )
+from app.common.utils.pin import verify_pin
 from app.repository.core.auth_repository.repository import AuthRepository
 
 logger = logging.getLogger(__name__)
@@ -144,11 +147,18 @@ class AuthService:
                 extra={"user_id": str(user.id)},
             )
 
+        # Short-lived setup token for the /user/pin/setup endpoint only
+        setup_token = create_access_token(
+            data={"user_id": str(user.id), "purpose": "pin_setup"},
+            expires_delta=timedelta(minutes=10),
+        )
+
         return {
             "user_id": str(user.id),
             "status": "ACTIVE",
             "account_id": str(account.id),
             "account_number": account.account_number,
+            "setup_token": setup_token,
         }
 
     # -----------------------------------------------------------------------
@@ -161,8 +171,8 @@ class AuthService:
         *,
         identifier: str,
         password: str,
-    ) -> None:
-        """Step 1: verify password and send a LOGIN OTP to the user's email."""
+    ) -> dict:
+        """Step 1: verify password, send LOGIN OTP, return has_pin flag."""
         user = await self.repo.get_user_by_identifier(db, identifier)
         if not user:
             raise user_not_found()
@@ -204,6 +214,60 @@ class AuthService:
                 "Failed to send login OTP",
                 extra={"user_id": str(user.id)},
             )
+
+        return {"has_pin": bool(user.pin_hash)}
+
+    async def login_with_pin(
+        self,
+        db: AsyncSession,
+        *,
+        identifier: str,
+        password: str,
+        pin: str,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict:
+        """Password + PIN combined login — skips OTP entirely."""
+        user = await self.repo.get_user_by_identifier(db, identifier)
+        if not user:
+            raise user_not_found()
+
+        now = datetime.utcnow()
+        if user.blocked_until and user.blocked_until > now:
+            raise user_blocked()
+
+        if not verify_password(password, user.password_hash):
+            await self.repo.increment_failed_attempts(db, user.id)
+            await db.commit()
+            raise invalid_credentials()
+
+        if not user.pin_hash:
+            raise pin_not_set()
+
+        if not verify_pin(pin, user.pin_hash):
+            raise invalid_pin()
+
+        await self.repo.reset_failed_attempts(db, user.id)
+        session = await self.repo.create_session(
+            db,
+            user_id=user.id,
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            session_meta={"full_name": user.full_name, "email": user.email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        await self.repo.update_last_login(db, user.id)
+        await db.commit()
+
+        access_token = create_access_token(
+            data={"user_id": str(user.id), "session_id": str(session.id)},
+            expires_delta=timedelta(minutes=30),
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "Bearer",
+            "session_id": str(session.id),
+        }
 
     async def verify_login_otp(
         self,

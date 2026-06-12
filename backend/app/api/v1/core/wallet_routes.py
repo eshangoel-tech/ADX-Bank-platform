@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.core.auth_dependency import AuthContext, get_current_user
 from app.common.responses import ok_response
 from app.repository.session import get_db
-from app.schemas.wallet import AddMoneyConfirmRequest, AddMoneyInitiateRequest
+from app.schemas.wallet import AddMoneyConfirmPinRequest, AddMoneyConfirmRequest, AddMoneyInitiateRequest
 from app.services.core.wallet_service.service import WalletService
 
 router = APIRouter()
@@ -53,11 +53,6 @@ async def confirm_add_money(
     auth: AuthContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Confirm an add-money request by verifying the OTP.
-
-    On success, the specified amount is credited to the user's account.
-    """
     service = WalletService()
     data = await service.confirm_add_money(
         db,
@@ -65,5 +60,23 @@ async def confirm_add_money(
         session_id=auth.session_id,
         topup_id=uuid.UUID(payload.topup_id),
         otp=payload.otp,
+    )
+    return ok_response(request, "Amount credited successfully.", data=data)
+
+
+@router.post("/add-money/confirm-pin")
+async def confirm_add_money_pin(
+    request: Request,
+    payload: AddMoneyConfirmPinRequest,
+    auth: AuthContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = WalletService()
+    data = await service.confirm_add_money_pin(
+        db,
+        user=auth.user,
+        session_id=auth.session_id,
+        topup_id=uuid.UUID(payload.topup_id),
+        pin=payload.pin,
     )
     return ok_response(request, "Amount credited successfully.", data=data)

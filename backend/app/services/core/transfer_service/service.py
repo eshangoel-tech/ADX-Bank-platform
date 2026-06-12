@@ -12,17 +12,23 @@ from app.common.utils.exceptions import (
     account_not_active,
     insufficient_balance,
     invalid_otp,
+    invalid_pin,
     max_otp_attempts,
     not_found,
     otp_expired,
+    pin_not_set,
     self_transfer_not_allowed,
     transfer_already_completed,
     transfer_not_found,
 )
 from app.common.utils.otp import generate_otp, hash_otp, send_otp_email, verify_otp_hash
+from app.common.utils.pin import verify_pin
+from sqlalchemy import select
 from app.repository.core.transfer_repository.repository import TransferRepository
+from app.repository.models.account import Account
 from app.repository.models.audit_log import AuditLog
 from app.repository.models.user import User
+from app.services.core.notification_service.service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +77,7 @@ class TransferService:
         session_id: UUID,
         to_account_number: str | None,
         to_phone: str | None,
+        to_upi: str | None = None,
         amount: Decimal,
     ) -> dict:
         """
@@ -87,11 +94,19 @@ class TransferService:
         if sender_account.status != "ACTIVE":
             raise account_not_active("Your account is not active")
 
-        # -- Fetch receiver account (by account number or phone)
+        # -- Fetch receiver account (by account number, phone, or UPI prefix)
         if to_account_number:
             receiver_account = await self.repo.get_account_by_number(db, to_account_number)
-        else:
+        elif to_phone:
             receiver_account = await self.repo.get_account_by_phone(db, to_phone)
+        else:
+            # UPI: extract handle prefix (before @) and try phone lookup
+            upi_handle = (to_upi or "").split("@")[0].strip()
+            # Attempt phone lookup with UPI prefix as phone
+            receiver_account = await self.repo.get_account_by_phone(db, upi_handle)
+            if not receiver_account:
+                # For demo purposes: UPI with no matching phone → not found
+                receiver_account = None
 
         if not receiver_account:
             raise not_found("Receiver account")
@@ -305,4 +320,117 @@ class TransferService:
                 },
             )
         )
+
+        # Sender notification
+        await NotificationService.create(
+            db, user_id=user.id, type="DEBIT",
+            title=f"₹{transfer.amount:,.0f} transferred",
+            body=f"Transfer of ₹{transfer.amount:,.0f} completed successfully.",
+            metadata={"transfer_id": str(transfer_id), "amount": str(transfer.amount)},
+        )
+        # Receiver notification
+        recv_res = await db.execute(select(Account).where(Account.id == transfer.receiver_account_id))
+        recv_obj = recv_res.scalar_one_or_none()
+        if recv_obj:
+            await NotificationService.create(
+                db, user_id=recv_obj.user_id, type="CREDIT",
+                title=f"₹{transfer.amount:,.0f} received",
+                body=f"You received ₹{transfer.amount:,.0f} in your ADX account.",
+                metadata={"transfer_id": str(transfer_id), "amount": str(transfer.amount)},
+            )
+
+        await db.commit()
+
+    # ------------------------------------------------------------------
+    # Step 2 (PIN path): confirm without OTP
+    # ------------------------------------------------------------------
+
+    async def confirm_transfer_pin(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        session_id: UUID,
+        transfer_id: UUID,
+        pin: str,
+    ) -> None:
+        if not user.pin_hash:
+            raise pin_not_set()
+
+        if not verify_pin(pin, user.pin_hash):
+            raise invalid_pin()
+
+        # Reuse the same atomic block — skip OTP validation
+        transfer = await self.repo.get_transfer_by_id(db, transfer_id)
+        if transfer is None:
+            raise transfer_not_found()
+
+        sender_account_check = await self.repo.get_account_by_user_id(db, user.id)
+        if (
+            sender_account_check is None
+            or sender_account_check.id != transfer.sender_account_id
+        ):
+            raise transfer_not_found()
+
+        if transfer.status != "PENDING":
+            raise transfer_already_completed()
+
+        sender = await self.repo.get_account_for_update(db, transfer.sender_account_id)
+        if sender is None:
+            raise not_found("Sender account")
+
+        if sender.balance < transfer.amount:
+            await self.repo.update_transfer_status(db, transfer_id, "FAILED")
+            await db.commit()
+            raise insufficient_balance()
+
+        new_sender_balance = sender.balance - transfer.amount
+        await self.repo.set_account_balance(db, transfer.sender_account_id, new_sender_balance)
+        new_receiver_balance = await self.repo.credit_account_balance(
+            db, transfer.receiver_account_id, transfer.amount
+        )
+
+        await self.repo.create_ledger_entry(
+            db, account_id=transfer.sender_account_id, entry_type="DEBIT",
+            amount=transfer.amount, balance_after=new_sender_balance,
+            reference_type="TRANSFER", reference_id=transfer.id,
+            description=f"Transfer to account {transfer.receiver_account_id}",
+        )
+        await self.repo.create_ledger_entry(
+            db, account_id=transfer.receiver_account_id, entry_type="CREDIT",
+            amount=transfer.amount, balance_after=new_receiver_balance,
+            reference_type="TRANSFER", reference_id=transfer.id,
+            description=f"Transfer from account {transfer.sender_account_id}",
+        )
+
+        await self.repo.update_transfer_status(db, transfer_id, "COMPLETED", completed_at=datetime.utcnow())
+
+        db.add(
+            self._audit(
+                user_id=user.id,
+                session_id=session_id,
+                event_type="TRANSFER_COMPLETED",
+                metadata={"transfer_id": str(transfer_id), "amount": str(transfer.amount), "method": "PIN"},
+            )
+        )
+
+        await NotificationService.create(
+            db, user_id=user.id, type="DEBIT",
+            title=f"₹{transfer.amount:,.0f} transferred",
+            body=f"Transfer of ₹{transfer.amount:,.0f} completed successfully.",
+            metadata={"transfer_id": str(transfer_id), "amount": str(transfer.amount)},
+        )
+
+        from sqlalchemy import select
+        from app.repository.models.account import Account
+        recv_res = await db.execute(select(Account).where(Account.id == transfer.receiver_account_id))
+        recv_obj = recv_res.scalar_one_or_none()
+        if recv_obj:
+            await NotificationService.create(
+                db, user_id=recv_obj.user_id, type="CREDIT",
+                title=f"₹{transfer.amount:,.0f} received",
+                body=f"You received ₹{transfer.amount:,.0f} in your ADX account.",
+                metadata={"transfer_id": str(transfer_id), "amount": str(transfer.amount)},
+            )
+
         await db.commit()

@@ -16,6 +16,8 @@ from app.api.v1.core.user_routes import router as user_v1_router
 from app.api.v1.core.transfer_routes import router as transfer_v1_router
 from app.api.v1.core.wallet_routes import router as wallet_v1_router
 from app.api.v1.core.loan_routes import router as loan_v1_router
+from app.api.v1.core.notification_routes import router as notification_v1_router
+from app.api.v1.core.request_routes import router as request_v1_router
 from app.api.v1.ai.assistant_routes import router as ai_assistant_router
 from app.common.utils.exceptions import AppException
 from app.services.ai.rag.vector_store import initialize_vector_store
@@ -48,6 +50,8 @@ app.include_router(user_v1_router, prefix="/api/v1", tags=["user"])
 app.include_router(transfer_v1_router, prefix="/api/v1/transfer", tags=["transfer"])
 app.include_router(wallet_v1_router, prefix="/api/v1/wallet", tags=["wallet"])
 app.include_router(loan_v1_router, prefix="/api/v1/loan", tags=["loan"])
+app.include_router(notification_v1_router, prefix="/api/v1", tags=["notifications"])
+app.include_router(request_v1_router, prefix="/api/v1", tags=["money-requests"])
 app.include_router(ai_assistant_router, prefix="/api/v1/ai/assistant", tags=["ai-assistant"])
 
 

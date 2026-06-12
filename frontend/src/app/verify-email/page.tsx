@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getErrorMessage } from "@/services/api";
-export default function VerifyEmailPage() {
-  const [email, setEmail] = useState("");
-  const router = useRouter();
 
-  // Pre-fill email carried over from the register page
+export default function VerifyEmailPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
   useEffect(() => {
     const pending = sessionStorage.getItem("adx_pending_email");
     if (pending) setEmail(pending);
   }, []);
-  const [otp, setOtp] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,9 +24,13 @@ export default function VerifyEmailPage() {
     setError(null);
     try {
       const { data } = await api.post("/auth/verify-email", { email, otp });
-      if (data?.success) {
+      const d = data?.data ?? data;
+      if (data?.success && d?.setup_token) {
         sessionStorage.removeItem("adx_pending_email");
-        setTimeout(() => router.push("/login"), 800);
+        // Store setup_token for the PIN setup page
+        sessionStorage.setItem("adx_setup_token", d.setup_token);
+        setSuccess(true);
+        setTimeout(() => router.push("/setup-pin"), 800);
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -36,51 +41,71 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="max-w-md mx-auto">
-      <h1 className="page-title">Verify Email</h1>
-
-      <div className="card">
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700">
-          Check your email for a 6-digit OTP and enter it below.
+      <div className="card space-y-6">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Verify Your Email</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+            Enter the 6-digit OTP sent to your registered email.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Email</label>
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
+        {success ? (
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} style={{ color: "var(--success)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium" style={{ color: "var(--success)" }}>Email verified! Setting up your PIN…</p>
           </div>
-          <div>
-            <label className="label">OTP (6 digits)</label>
-            <input
-              className="input"
-              type="text"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="123456"
-              maxLength={6}
-              required
-            />
-          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Email</label>
+              <input
+                className="input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">OTP (6 digits)</label>
+              <input
+                className="input tracking-[0.5em] text-center text-lg font-bold font-mono"
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="• • • • • •"
+                maxLength={6}
+                autoFocus
+                required
+              />
+            </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? "Verifying..." : "Verify Email"}
-          </button>
-        </form>
+            {error && (
+              <p className="text-sm px-3 py-2 rounded-lg" style={{ color: "var(--danger)", backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                {error}
+              </p>
+            )}
 
-        {error && <p className="mt-3 text-sm text-red-400 bg-red-900/10 border border-red-800/40 rounded-lg px-3 py-2">{error}</p>}
+            <button type="submit" disabled={loading || otp.length < 6} className="btn-primary w-full">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.4)", borderTopColor: "transparent" }} />
+                  Verifying…
+                </span>
+              ) : "Verify Email →"}
+            </button>
 
-        <p className="mt-4 text-sm text-gray-500 text-center">
-          Verified?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Login
-          </Link>
-        </p>
+            <p className="text-sm text-center" style={{ color: "var(--text-tertiary)" }}>
+              Already verified?{" "}
+              <Link href="/login" style={{ color: "var(--accent)" }}>Login</Link>
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );

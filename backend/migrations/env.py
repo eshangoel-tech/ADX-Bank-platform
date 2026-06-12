@@ -39,6 +39,8 @@ from app.repository.models import (  # noqa: F401
     ChatSession,
     ChatResponse,
     LLMInteraction,
+    Notification,
+    PaymentRequest,
 )
 
 target_metadata = Base.metadata

@@ -135,6 +135,34 @@ def loan_booking_expired(
 
 
 # ---------------------------------------------------------------------------
+# PIN
+# ---------------------------------------------------------------------------
+
+def invalid_pin(message: str = "Invalid PIN") -> AppException:
+    return AppException(code="INVALID_PIN", message=message, http_status=400)
+
+
+def pin_not_set(message: str = "PIN not set up yet. Please set your PIN first.") -> AppException:
+    return AppException(code="PIN_NOT_SET", message=message, http_status=400)
+
+
+# ---------------------------------------------------------------------------
+# Payment Requests
+# ---------------------------------------------------------------------------
+
+def request_not_found(message: str = "Payment request not found") -> AppException:
+    return AppException(code="REQUEST_NOT_FOUND", message=message, http_status=404)
+
+
+def request_expired(message: str = "Payment request has expired") -> AppException:
+    return AppException(code="REQUEST_EXPIRED", message=message, http_status=410)
+
+
+def request_already_resolved(message: str = "Payment request has already been resolved") -> AppException:
+    return AppException(code="REQUEST_ALREADY_RESOLVED", message=message, http_status=409)
+
+
+# ---------------------------------------------------------------------------
 # AI Assistant
 # ---------------------------------------------------------------------------
 
