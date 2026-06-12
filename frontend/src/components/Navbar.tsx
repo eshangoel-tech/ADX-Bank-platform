@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
+import { AdxLogo } from "@/components/AdxLogo";
 
 export function Navbar() {
   const { isAuthenticated, logout } = useAuth();
@@ -97,14 +98,8 @@ export function Navbar() {
           className="flex items-center gap-2.5 group flex-1"
           aria-label="ADX Bank home"
         >
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black shrink-0 transition-transform duration-200 group-hover:scale-105"
-            style={{
-              background: "linear-gradient(135deg, var(--accent) 0%, #0e7490 100%)",
-              boxShadow: "0 2px 10px var(--accent-glow)",
-            }}
-          >
-            A
+          <div className="shrink-0 transition-transform duration-200 group-hover:scale-105">
+            <AdxLogo size={32} />
           </div>
           <span
             className="font-display font-bold text-lg tracking-tight"

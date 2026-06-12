@@ -43,6 +43,7 @@ LOAN_ALLOWED_TENURES: list[int] = _rules["loan"]["allowed_tenures_months"]
 LOAN_MAX_TENURE_MONTHS: int = _rules["loan"]["max_tenure_months"]
 LOAN_MIN_SALARY: int = _rules["loan"]["min_monthly_salary_for_eligibility_inr"]
 LOAN_PROCESSING_FEE_PERCENT: int = _rules["loan"]["loan_processing_fee_percent"]
+LOAN_FORECLOSURE_FEE_PERCENT: int = _rules["loan"]["foreclosure_fee_percent"]
 LOAN_BOOKING_REDIS_TTL_SECONDS: int = _rules["loan"]["booking_redis_ttl_seconds"]
 LOAN_OTP_TTL_SECONDS: int = _rules["loan"]["otp_ttl_seconds"]
 

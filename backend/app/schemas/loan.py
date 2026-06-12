@@ -114,3 +114,20 @@ class LoanPayResponse(BaseModel):
     amount_paid: str
     outstanding_after: str
     loan_status: str
+
+
+class LoanPayPinRequest(BaseModel):
+    pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class LoanForeclosePinRequest(BaseModel):
+    pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class LoanForecloseResponse(BaseModel):
+    loan_id: str
+    outstanding_paid: str
+    foreclosure_fee_percent: str
+    foreclosure_fee: str
+    total_charged: str
+    loan_status: str

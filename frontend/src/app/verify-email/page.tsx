@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getErrorMessage } from "@/services/api";
+import { AdxLogo } from "@/components/AdxLogo";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -50,13 +51,19 @@ export default function VerifyEmailPage() {
         </div>
 
         {success ? (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}>
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} style={{ color: "var(--success)" }}>
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <AdxLogo size={64} />
+            <div>
+              <p className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>ADX Bank</p>
+              <p className="text-xs uppercase tracking-widest font-semibold mt-0.5" style={{ color: "var(--text-tertiary)" }}>AI-Powered Digital Banking</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg px-4 py-2.5"
+              style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} style={{ color: "var(--success)" }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
+              <p className="text-sm font-medium" style={{ color: "var(--success)" }}>Email verified! Setting up your PIN…</p>
             </div>
-            <p className="text-sm font-medium" style={{ color: "var(--success)" }}>Email verified! Setting up your PIN…</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

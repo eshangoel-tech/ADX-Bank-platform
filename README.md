@@ -2,7 +2,6 @@
 
 > AI-powered digital banking platform with multi-agent architecture
 
-[![CI](https://github.com/eshangoel-tech/adx-bank-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/eshangoel-tech/adx-bank-platform/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)
 ![License MIT](https://img.shields.io/badge/License-MIT-c9a84c)

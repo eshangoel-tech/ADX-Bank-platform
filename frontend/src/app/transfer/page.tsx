@@ -155,6 +155,18 @@ function TransferContent() {
                   <h2 className="font-display text-xl font-bold" style={{ color: "var(--text-primary)" }}>Transfer Successful</h2>
                   <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>Your funds have been transferred.</p>
                 </div>
+                {/* UPI test disclaimer */}
+                {method === "upi" && (
+                  <div className="flex items-start gap-2.5 rounded-lg px-3.5 py-2.5 text-left"
+                    style={{ backgroundColor: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--warning)" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-xs leading-relaxed" style={{ color: "#fbbf24" }}>
+                      UPI transfers in ADX Bank are simulated — external UPI IDs don&apos;t have real accounts here, so only your balance was debited as a test transaction.
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-xl p-4 text-left space-y-3" style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}>
                   <div className="flex justify-between items-center">
                     <span className="text-xs uppercase tracking-wide" style={{ color: "var(--text-tertiary)" }}>Recipient</span>
@@ -169,7 +181,10 @@ function TransferContent() {
                     <span className="font-display text-xl font-bold" style={{ color: "var(--gold)" }}>₹{parseFloat(initData?.amount ?? "0").toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
-                <button onClick={handleReset} className="btn-primary w-full cursor-pointer">New Transfer</button>
+                <div className="flex gap-3">
+                  <a href="/dashboard" className="btn-secondary flex-1 cursor-pointer text-center">← Dashboard</a>
+                  <button onClick={handleReset} className="btn-primary flex-1 cursor-pointer">New Transfer</button>
+                </div>
               </div>
             </motion.div>
           )}

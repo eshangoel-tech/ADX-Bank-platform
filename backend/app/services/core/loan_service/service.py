@@ -24,6 +24,7 @@ from app.common.utils.otp import generate_otp, hash_otp, send_otp_email
 from app.config.bank_rules.bank_rules import (
     LOAN_ALLOWED_TENURES,
     LOAN_BOOKING_REDIS_TTL_SECONDS,
+    LOAN_FORECLOSURE_FEE_PERCENT,
     LOAN_INTEREST_RATE_PA,
     LOAN_MIN_AMOUNT,
     LOAN_MIN_SALARY,
@@ -384,6 +385,179 @@ class LoanService:
             for loan in loans
         ]
         return {"loans": items}
+
+    # ------------------------------------------------------------------
+    # POST /loan/{loan_id}/pay-pin  (PIN-based, single step)
+    # ------------------------------------------------------------------
+
+    async def pay_loan_with_pin(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        session_id: UUID,
+        loan_id: UUID,
+        pin: str,
+    ) -> dict:
+        from app.common.utils.pin import verify_pin
+
+        loan = await self.repo.get_loan_by_id(db, loan_id)
+        if loan is None or loan.user_id != user.id:
+            raise not_found("Loan")
+
+        if loan.status != "ACTIVE":
+            raise AppException(
+                code="LOAN_NOT_ACTIVE",
+                message="Loan is not active and cannot accept payments.",
+                http_status=400,
+            )
+
+        if not user.pin_hash:
+            raise AppException(
+                code="PIN_NOT_SET",
+                message="No PIN set. Please set up your PIN from Account settings.",
+                http_status=400,
+            )
+
+        if not verify_pin(pin, user.pin_hash):
+            raise AppException(code="INVALID_PIN", message="Invalid PIN.", http_status=400)
+
+        payment_amount = min(loan.emi_amount, loan.outstanding_amount)
+        account = await self.repo.get_account_for_update(db, loan.account_id)
+        if account is None:
+            raise not_found("Account")
+        if account.balance < payment_amount:
+            raise insufficient_balance(
+                "Insufficient balance to pay EMI. Please add money first."
+            )
+
+        new_balance = await self.repo.debit_account_balance(db, loan.account_id, payment_amount)
+
+        new_outstanding = loan.outstanding_amount - payment_amount
+        new_status = "CLOSED" if new_outstanding <= 0 else "ACTIVE"
+        await self.repo.update_loan_outstanding(db, loan_id, new_outstanding, status=new_status)
+
+        await self.repo.create_ledger_entry(
+            db,
+            account_id=loan.account_id,
+            entry_type="DEBIT",
+            amount=payment_amount,
+            balance_after=new_balance,
+            reference_type="LOAN_PAYMENT",
+            reference_id=loan_id,
+            description=f"EMI payment for loan {loan_id}",
+        )
+
+        db.add(
+            self._audit(
+                user_id=user.id,
+                session_id=session_id,
+                event_type="LOAN_PAYMENT_MADE",
+                metadata={
+                    "loan_id": str(loan_id),
+                    "amount_paid": str(payment_amount),
+                    "outstanding_after": str(new_outstanding),
+                    "loan_status": new_status,
+                },
+            )
+        )
+        await db.commit()
+
+        return {
+            "loan_id": str(loan_id),
+            "amount_paid": str(payment_amount),
+            "outstanding_after": str(new_outstanding),
+            "loan_status": new_status,
+        }
+
+    # ------------------------------------------------------------------
+    # POST /loan/{loan_id}/foreclose-pin  (PIN-based, full payoff)
+    # ------------------------------------------------------------------
+
+    async def foreclose_loan_with_pin(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        session_id: UUID,
+        loan_id: UUID,
+        pin: str,
+    ) -> dict:
+        from app.common.utils.pin import verify_pin
+
+        loan = await self.repo.get_loan_by_id(db, loan_id)
+        if loan is None or loan.user_id != user.id:
+            raise not_found("Loan")
+
+        if loan.status != "ACTIVE":
+            raise AppException(
+                code="LOAN_NOT_ACTIVE",
+                message="Loan is not active and cannot be foreclosed.",
+                http_status=400,
+            )
+
+        if not user.pin_hash:
+            raise AppException(
+                code="PIN_NOT_SET",
+                message="No PIN set. Please set up your PIN from Account settings.",
+                http_status=400,
+            )
+
+        if not verify_pin(pin, user.pin_hash):
+            raise AppException(code="INVALID_PIN", message="Invalid PIN.", http_status=400)
+
+        outstanding = loan.outstanding_amount
+        fee_pct = Decimal(str(LOAN_FORECLOSURE_FEE_PERCENT)) / Decimal("100")
+        foreclosure_fee = (outstanding * fee_pct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        total_amount = outstanding + foreclosure_fee
+
+        account = await self.repo.get_account_for_update(db, loan.account_id)
+        if account is None:
+            raise not_found("Account")
+        if account.balance < total_amount:
+            raise insufficient_balance(
+                f"Insufficient balance. You need ₹{total_amount} to foreclose "
+                f"(outstanding ₹{outstanding} + {LOAN_FORECLOSURE_FEE_PERCENT}% fee ₹{foreclosure_fee})."
+            )
+
+        new_balance = await self.repo.debit_account_balance(db, loan.account_id, total_amount)
+        await self.repo.update_loan_outstanding(db, loan_id, Decimal("0"), status="CLOSED")
+
+        await self.repo.create_ledger_entry(
+            db,
+            account_id=loan.account_id,
+            entry_type="DEBIT",
+            amount=total_amount,
+            balance_after=new_balance,
+            reference_type="LOAN_FORECLOSURE",
+            reference_id=loan_id,
+            description=f"Loan foreclosure for loan {loan_id} (incl. {LOAN_FORECLOSURE_FEE_PERCENT}% fee ₹{foreclosure_fee})",
+        )
+
+        db.add(
+            self._audit(
+                user_id=user.id,
+                session_id=session_id,
+                event_type="LOAN_FORECLOSED",
+                metadata={
+                    "loan_id": str(loan_id),
+                    "outstanding_paid": str(outstanding),
+                    "foreclosure_fee_percent": str(LOAN_FORECLOSURE_FEE_PERCENT),
+                    "foreclosure_fee": str(foreclosure_fee),
+                    "total_charged": str(total_amount),
+                },
+            )
+        )
+        await db.commit()
+
+        return {
+            "loan_id": str(loan_id),
+            "outstanding_paid": str(outstanding),
+            "foreclosure_fee_percent": str(LOAN_FORECLOSURE_FEE_PERCENT),
+            "foreclosure_fee": str(foreclosure_fee),
+            "total_charged": str(total_amount),
+            "loan_status": "CLOSED",
+        }
 
     # ------------------------------------------------------------------
     # POST /loan/{loan_id}/pay/initiate  (Step 1)

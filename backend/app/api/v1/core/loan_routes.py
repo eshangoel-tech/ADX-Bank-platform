@@ -11,7 +11,9 @@ from app.repository.session import get_db
 from app.schemas.loan import (
     LoanBookRequest,
     LoanConfirmRequest,
+    LoanForeclosePinRequest,
     LoanPayConfirmRequest,
+    LoanPayPinRequest,
     LoanSimulateRequest,
 )
 from app.common.responses import ok_response
@@ -138,6 +140,54 @@ async def list_loans(
     service = LoanService()
     data = await service.get_loans(db, user_id=auth.user.id)
     return ok_response(request, "Loans fetched.", data=data)
+
+
+# ---------------------------------------------------------------------------
+# POST /loan/{loan_id}/pay-pin  — PIN-based single-step EMI payment
+# ---------------------------------------------------------------------------
+
+@router.post("/{loan_id}/pay-pin")
+async def pay_loan_with_pin(
+    request: Request,
+    loan_id: UUID,
+    payload: LoanPayPinRequest,
+    auth: AuthContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pay one EMI using the user's 6-digit PIN. Single-step, no OTP required."""
+    service = LoanService()
+    data = await service.pay_loan_with_pin(
+        db,
+        user=auth.user,
+        session_id=auth.session_id,
+        loan_id=loan_id,
+        pin=payload.pin,
+    )
+    return ok_response(request, "EMI paid successfully.", data=data)
+
+
+# ---------------------------------------------------------------------------
+# POST /loan/{loan_id}/foreclose-pin  — PIN-based full loan payoff
+# ---------------------------------------------------------------------------
+
+@router.post("/{loan_id}/foreclose-pin")
+async def foreclose_loan_with_pin(
+    request: Request,
+    loan_id: UUID,
+    payload: LoanForeclosePinRequest,
+    auth: AuthContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Foreclose (fully repay) a loan using the user's PIN. Applies 2% foreclosure fee."""
+    service = LoanService()
+    data = await service.foreclose_loan_with_pin(
+        db,
+        user=auth.user,
+        session_id=auth.session_id,
+        loan_id=loan_id,
+        pin=payload.pin,
+    )
+    return ok_response(request, "Loan foreclosed successfully.", data=data)
 
 
 # ---------------------------------------------------------------------------

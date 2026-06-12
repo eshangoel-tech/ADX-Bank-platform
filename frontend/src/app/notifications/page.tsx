@@ -74,7 +74,7 @@ function NotificationsContent() {
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
-    api.get("/notifications?limit=50")
+    api.get("/notifications?limit=50&unread_only=true")
       .then(({ data }) => {
         const d = data?.data ?? data;
         setNotifications(d?.notifications ?? d ?? []);

@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { api, getErrorMessage } from "@/services/api";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageTransition } from "@/components/PageTransition";
+import { PinInput } from "@/components/PinInput";
 import { Spinner } from "@/components/Spinner";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -451,14 +452,18 @@ const STATUS_BADGE: Record<string, string> = {
   ACTIVE: "badge-green", PENDING: "badge-yellow", CLOSED: "badge-gray", REJECTED: "badge-red",
 };
 
+const FORECLOSURE_FEE_PCT = 2;
+
 function ManageLoansPanel() {
   const [loans, setLoans] = useState<LoanRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLoan, setSelectedLoan] = useState<LoanRecord | null>(null);
+  const [activeAction, setActiveAction] = useState<{ loanId: string; type: "emi" | "full" } | null>(null);
+  const [pinValue, setPinValue] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
-  const [paySuccess, setPaySuccess] = useState<string | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
+  const [successType, setSuccessType] = useState<"emi" | "full" | null>(null);
 
   const fetchLoans = async () => {
     setLoading(true);
@@ -475,14 +480,31 @@ function ManageLoansPanel() {
 
   useEffect(() => { fetchLoans(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handlePayEmi = async (loan: LoanRecord) => {
-    setSelectedLoan(loan);
+  const startAction = (loanId: string, type: "emi" | "full") => {
+    setActiveAction({ loanId, type });
+    setPinValue("");
+    setPayError(null);
+    setSuccessId(null);
+  };
+
+  const cancelAction = () => { setActiveAction(null); setPinValue(""); setPayError(null); };
+
+  const handlePayPin = async (e: React.FormEvent, loan: LoanRecord) => {
+    e.preventDefault();
+    if (pinValue.length < 6) return;
     setPayLoading(true);
     setPayError(null);
-    setPaySuccess(null);
     try {
-      await api.post("/loan/pay-emi", { loan_id: loan.id });
-      setPaySuccess(loan.id);
+      if (activeAction!.type === "emi") {
+        await api.post(`/loan/${loan.id}/pay-pin`, { pin: pinValue });
+        setSuccessType("emi");
+      } else {
+        await api.post(`/loan/${loan.id}/foreclose-pin`, { pin: pinValue });
+        setSuccessType("full");
+      }
+      setSuccessId(loan.id);
+      setActiveAction(null);
+      setPinValue("");
       fetchLoans();
     } catch (err) {
       setPayError(getErrorMessage(err));
@@ -496,7 +518,7 @@ function ManageLoansPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-lg font-bold" style={{ color: "var(--text-primary)" }}>My Loans</h2>
-          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>View loans and pay monthly EMIs.</p>
+          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>View loans, pay EMIs, or foreclose.</p>
         </div>
         <button onClick={fetchLoans} disabled={loading} className="btn-primary cursor-pointer">
           {loading ? <span className="flex items-center gap-2"><Spinner size={16} /> Loading…</span> : "Refresh"}
@@ -505,54 +527,200 @@ function ManageLoansPanel() {
       {error && <div className="error-box">{error}</div>}
       {loans.length > 0 ? (
         <div className="space-y-3">
-          {loans.map((loan) => (
-            <div key={loan.id} className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
-                      ₹{parseFloat(loan.principal_amount).toLocaleString("en-IN")}
-                    </span>
-                    <span className={STATUS_BADGE[loan.status] ?? "badge-gray"}>{loan.status}</span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    {[
-                      { label: "EMI", value: `₹${parseFloat(loan.emi_amount).toLocaleString("en-IN")}` },
-                      { label: "Outstanding", value: `₹${parseFloat(loan.outstanding_amount).toLocaleString("en-IN")}` },
-                      { label: "Tenure", value: `${loan.tenure_months}mo @ ${loan.interest_rate}%` },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-tertiary)" }}>{item.label}</p>
-                        <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{item.value}</p>
+          {loans.map((loan) => {
+            const principal = parseFloat(loan.principal_amount);
+            const outstanding = parseFloat(loan.outstanding_amount);
+            const emiAmt = parseFloat(loan.emi_amount);
+            const emisPaid = Math.max(0, Math.round((principal - outstanding) / emiAmt));
+            const emisLeft = loan.tenure_months - emisPaid;
+            const emisProgress = Math.min(100, (emisPaid / loan.tenure_months) * 100);
+            const fcFee = Math.round(outstanding * (FORECLOSURE_FEE_PCT / 100) * 100) / 100;
+            const fcTotal = outstanding + fcFee;
+            const isActive = activeAction?.loanId === loan.id;
+            const isEmiFlow = isActive && activeAction?.type === "emi";
+            const isFullFlow = isActive && activeAction?.type === "full";
+
+            return (
+              <div key={loan.id} className="rounded-xl p-4"
+                style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}>
+
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left: loan info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+                        ₹{principal.toLocaleString("en-IN")}
+                      </span>
+                      <span className={STATUS_BADGE[loan.status] ?? "badge-gray"}>{loan.status}</span>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {[
+                        { label: "EMI", value: `₹${emiAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` },
+                        { label: "Outstanding", value: `₹${outstanding.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` },
+                        { label: "Tenure", value: `${loan.tenure_months}mo @ ${loan.interest_rate}%` },
+                      ].map((item) => (
+                        <div key={item.label}>
+                          <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-tertiary)" }}>{item.label}</p>
+                          <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* EMI progress bar */}
+                    {loan.status === "ACTIVE" && (
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-tertiary)" }}>EMIs paid</span>
+                          <span className="text-[10px] font-bold font-mono" style={{ color: "var(--text-secondary)" }}>
+                            {emisPaid} / {loan.tenure_months}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--border-default)" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${emisProgress}%`, backgroundColor: "var(--accent)" }}
+                          />
+                        </div>
+                        <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
+                          {emisLeft > 0 ? `${emisLeft} EMI${emisLeft !== 1 ? "s" : ""} remaining` : "Last EMI due"}
+                        </p>
                       </div>
-                    ))}
+                    )}
+
+                    <p className="text-[10px] font-mono mt-2 truncate" style={{ color: "var(--text-tertiary)" }}>{loan.id}</p>
                   </div>
-                  <p className="text-[10px] font-mono mt-2 truncate" style={{ color: "var(--text-tertiary)" }}>{loan.id}</p>
+
+                  {/* Right: action buttons */}
+                  {loan.status === "ACTIVE" && !isActive && (
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <button
+                        onClick={() => startAction(loan.id, "emi")}
+                        className="btn-primary text-xs py-1.5 px-3 cursor-pointer"
+                      >
+                        Pay EMI
+                      </button>
+                      <button
+                        onClick={() => startAction(loan.id, "full")}
+                        className="text-xs py-1.5 px-3 rounded-lg font-semibold transition-all duration-150 cursor-pointer"
+                        style={{
+                          backgroundColor: "rgba(245,158,11,0.08)",
+                          color: "var(--warning)",
+                          border: "1px solid rgba(245,158,11,0.35)",
+                        }}
+                      >
+                        Pay Full
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {loan.status === "ACTIVE" && (
-                  <button onClick={() => handlePayEmi(loan)} disabled={payLoading && selectedLoan?.id === loan.id}
-                    className="btn-primary shrink-0 text-xs py-1.5 px-3 cursor-pointer">
-                    {payLoading && selectedLoan?.id === loan.id
-                      ? <span className="flex items-center gap-1.5"><Spinner size={12} /> Paying…</span>
-                      : "Pay EMI"}
-                  </button>
-                )}
+
+                {/* ── Inline action panel ── */}
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.22 }}
+                      className="overflow-hidden"
+                    >
+                      <form
+                        onSubmit={(e) => handlePayPin(e, loan)}
+                        className="mt-4 pt-4 space-y-4"
+                        style={{ borderTop: "1px solid var(--border-subtle)" }}
+                      >
+                        {/* Foreclosure summary */}
+                        {isFullFlow && (
+                          <div className="rounded-xl p-4 space-y-3"
+                            style={{ backgroundColor: "var(--bg-card)", border: "1px solid rgba(245,158,11,0.3)" }}>
+                            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--warning)" }}>
+                              Foreclosure Summary
+                            </p>
+                            <div className="space-y-2">
+                              {[
+                                { label: "Outstanding Balance", value: `₹${inr(outstanding)}`, color: "var(--text-primary)" },
+                                { label: `Foreclosure Fee (${FORECLOSURE_FEE_PCT}%)`, value: `₹${inr(fcFee)}`, color: "var(--warning)" },
+                              ].map((row) => (
+                                <div key={row.label} className="flex items-center justify-between">
+                                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{row.label}</span>
+                                  <span className="text-xs font-semibold" style={{ color: row.color }}>{row.value}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between pt-2"
+                                style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                                <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Total Debit</span>
+                                <span className="text-sm font-bold" style={{ color: "var(--danger)" }}>₹{inr(fcTotal)}</span>
+                              </div>
+                            </div>
+                            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                              This will permanently close your loan account.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* EMI flow header */}
+                        {isEmiFlow && (
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--accent)" }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                              Enter PIN to pay ₹{inr(emiAmt)} EMI
+                            </p>
+                          </div>
+                        )}
+
+                        <PinInput value={pinValue} onChange={setPinValue} autoFocus />
+                        {payError && <p className="error-box">{payError}</p>}
+
+                        <div className="flex gap-2">
+                          <button type="button" onClick={cancelAction}
+                            className="btn-secondary flex-1 text-xs cursor-pointer">
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={payLoading || pinValue.length < 6}
+                            className="flex-1 text-xs py-2 px-4 rounded-lg font-semibold transition-all duration-150 cursor-pointer disabled:opacity-50"
+                            style={isFullFlow
+                              ? { backgroundColor: "var(--warning)", color: "#fff", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }
+                              : { backgroundColor: "var(--accent)", color: "#fff", boxShadow: "0 2px 8px var(--accent-glow)" }
+                            }
+                          >
+                            {payLoading
+                              ? <span className="flex items-center justify-center gap-1.5"><Spinner size={12} /> Processing…</span>
+                              : isFullFlow ? "Close Loan & Pay" : "Confirm EMI"
+                            }
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* ── Success feedback ── */}
+                <AnimatePresence>
+                  {successId === loan.id && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="mt-3 pt-3 flex items-center gap-2"
+                      style={{ borderTop: "1px solid var(--border-subtle)" }}
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} style={{ color: "var(--success)" }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <p className="text-sm font-medium" style={{ color: "var(--success)" }}>
+                        {successType === "full" ? "Loan foreclosed and closed successfully." : "EMI paid successfully."}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              {selectedLoan?.id === loan.id && paySuccess === loan.id && (
-                <div className="mt-3 pt-3 flex items-center gap-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} style={{ color: "var(--success)" }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-sm font-medium" style={{ color: "var(--success)" }}>EMI paid successfully.</p>
-                </div>
-              )}
-              {selectedLoan?.id === loan.id && payError && (
-                <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                  <p className="text-sm" style={{ color: "var(--danger)" }}>{payError}</p>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         !loading && (

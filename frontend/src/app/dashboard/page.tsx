@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getErrorMessage } from "@/services/api";
+import { AdxLogo } from "@/components/AdxLogo";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageTransition } from "@/components/PageTransition";
 import { StaggerContainer, StaggerItem } from "@/components/StaggerContainer";
@@ -146,12 +147,9 @@ function WelcomeOverlay({ name }: { name: string }) {
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, type: "spring", stiffness: 180, damping: 14 }}
-          className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center"
-          style={{ backgroundColor: "var(--accent-muted)", border: "1px solid var(--border-default)" }}
+          className="mx-auto w-fit"
         >
-          <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--accent)" }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-          </svg>
+          <AdxLogo size={80} />
         </motion.div>
         <motion.p
           initial={{ opacity: 0, y: 10 }}

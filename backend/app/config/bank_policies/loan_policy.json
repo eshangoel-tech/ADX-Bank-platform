@@ -22,11 +22,13 @@
     "step_5": "Loan status changes to ACTIVE after approval"
   },
   "repayment": {
-    "emi_payment": "EMI payments are made via /loan/{loan_id}/pay endpoint",
+    "emi_payment": "EMI payments are made via /loan/{loan_id}/pay-pin endpoint using the customer's 6-digit PIN",
     "payment_deducted_from": "Primary savings account balance",
     "partial_payment": "Minimum payment is the EMI amount; excess reduces outstanding principal",
     "loan_closure": "Loan is marked CLOSED when outstanding balance reaches zero",
-    "prepayment_penalty": "No prepayment penalty for personal loans"
+    "foreclosure": "Customers may foreclose (pay off) the entire outstanding balance at any time via Pay Full option",
+    "foreclosure_fee": "A 2% foreclosure charge is levied on the outstanding principal at the time of foreclosure",
+    "foreclosure_example": "E.g. ₹29,000 outstanding × 2% = ₹580 fee → Total debit ₹29,580"
   },
   "default_policy": {
     "overdue_definition": "EMI not paid within 30 days of due date",
