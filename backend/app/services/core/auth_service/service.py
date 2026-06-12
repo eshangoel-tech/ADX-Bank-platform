@@ -191,12 +191,51 @@ class AuthService:
             await db.commit()
             raise invalid_credentials()
 
-        # Correct password — reset counter and issue OTP
+        # Correct password — reset counter
+        await self.repo.reset_failed_attempts(db, user.id)
+
+        has_pin = bool(user.pin_hash)
+
+        # Only issue OTP if the user hasn't set a PIN yet
+        if not has_pin:
+            otp = generate_otp()
+            otp_hash = hash_otp(otp)
+            expires_at = datetime.utcnow() + timedelta(minutes=5)
+            await self.repo.create_otp(
+                db,
+                user_id=user.id,
+                otp_hash=otp_hash,
+                otp_type="LOGIN",
+                expires_at=expires_at,
+                max_attempts=3,
+            )
+            await db.commit()
+            try:
+                await send_otp_email(user.email, otp, otp_type="LOGIN")
+            except Exception:
+                logger.exception("Failed to send login OTP", extra={"user_id": str(user.id)})
+        else:
+            await db.commit()
+
+        return {"has_pin": has_pin}
+
+    async def request_login_otp(
+        self,
+        db: AsyncSession,
+        *,
+        identifier: str,
+        password: str,
+    ) -> None:
+        """Explicitly send a LOGIN OTP — used when PIN user opts for OTP fallback."""
+        user = await self.repo.get_user_by_identifier(db, identifier)
+        if not user:
+            raise user_not_found()
+        if not verify_password(password, user.password_hash):
+            raise invalid_credentials()
+
         otp = generate_otp()
         otp_hash = hash_otp(otp)
         expires_at = datetime.utcnow() + timedelta(minutes=5)
-
-        await self.repo.reset_failed_attempts(db, user.id)
         await self.repo.create_otp(
             db,
             user_id=user.id,
@@ -206,16 +245,10 @@ class AuthService:
             max_attempts=3,
         )
         await db.commit()
-
         try:
             await send_otp_email(user.email, otp, otp_type="LOGIN")
         except Exception:
-            logger.exception(
-                "Failed to send login OTP",
-                extra={"user_id": str(user.id)},
-            )
-
-        return {"has_pin": bool(user.pin_hash)}
+            logger.exception("Failed to send fallback login OTP", extra={"user_id": str(user.id)})
 
     async def login_with_pin(
         self,

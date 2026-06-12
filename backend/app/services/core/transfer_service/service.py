@@ -1,7 +1,9 @@
 """Transfer service: initiate and confirm internal money transfers."""
 from __future__ import annotations
 
+import json
 import logging
+import uuid as _uuid_module
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -23,6 +25,7 @@ from app.common.utils.exceptions import (
 )
 from app.common.utils.otp import generate_otp, hash_otp, send_otp_email, verify_otp_hash
 from app.common.utils.pin import verify_pin
+from app.config.redis import get_redis
 from sqlalchemy import select
 from app.repository.core.transfer_repository.repository import TransferRepository
 from app.repository.models.account import Account
@@ -102,11 +105,30 @@ class TransferService:
         else:
             # UPI: extract handle prefix (before @) and try phone lookup
             upi_handle = (to_upi or "").split("@")[0].strip()
-            # Attempt phone lookup with UPI prefix as phone
             receiver_account = await self.repo.get_account_by_phone(db, upi_handle)
             if not receiver_account:
-                # For demo purposes: UPI with no matching phone → not found
-                receiver_account = None
+                # No real ADX user found — create a mock UPI transfer stored in Redis
+                if sender_account.balance < amount:
+                    raise insufficient_balance()
+                mock_id = _uuid_module.uuid4()
+                redis = get_redis()
+                redis.setex(
+                    f"upi_mock_transfer:{mock_id}",
+                    300,
+                    json.dumps({
+                        "user_id": str(user.id),
+                        "sender_account_id": str(sender_account.id),
+                        "amount": str(amount),
+                        "upi_id": to_upi,
+                    }),
+                )
+                display_name = upi_handle.replace(".", " ").title() + " (UPI)"
+                return {
+                    "transfer_id": str(mock_id),
+                    "receiver_name": display_name,
+                    "receiver_account": to_upi,
+                    "amount": str(amount),
+                }
 
         if not receiver_account:
             raise not_found("Receiver account")
@@ -359,6 +381,46 @@ class TransferService:
 
         if not verify_pin(pin, user.pin_hash):
             raise invalid_pin()
+
+        # Check if this is a mock UPI transfer (no real receiver account)
+        redis = get_redis()
+        raw = redis.get(f"upi_mock_transfer:{transfer_id}")
+        if raw is not None:
+            ctx = json.loads(raw)
+            if ctx["user_id"] != str(user.id):
+                raise transfer_not_found()
+            amount = Decimal(ctx["amount"])
+            sender_account_id = UUID(ctx["sender_account_id"])
+            upi_id = ctx["upi_id"]
+
+            sender = await self.repo.get_account_for_update(db, sender_account_id)
+            if sender is None:
+                raise not_found("Sender account")
+            if sender.balance < amount:
+                raise insufficient_balance()
+
+            new_sender_balance = sender.balance - amount
+            await self.repo.set_account_balance(db, sender_account_id, new_sender_balance)
+            await self.repo.create_ledger_entry(
+                db, account_id=sender_account_id, entry_type="DEBIT",
+                amount=amount, balance_after=new_sender_balance,
+                reference_type="UPI_TRANSFER", reference_id=transfer_id,
+                description=f"UPI transfer to {upi_id}",
+            )
+            db.add(self._audit(
+                user_id=user.id, session_id=session_id,
+                event_type="TRANSFER_COMPLETED",
+                metadata={"transfer_id": str(transfer_id), "amount": str(amount), "method": "UPI_PIN", "upi_id": upi_id},
+            ))
+            await NotificationService.create(
+                db, user_id=user.id, type="DEBIT",
+                title=f"₹{amount:,.0f} sent via UPI",
+                body=f"Paid to {upi_id}. New balance: ₹{new_sender_balance:,.0f}",
+                metadata={"transfer_id": str(transfer_id), "amount": str(amount), "upi_id": upi_id},
+            )
+            await db.commit()
+            redis.delete(f"upi_mock_transfer:{transfer_id}")
+            return
 
         # Reuse the same atomic block — skip OTP validation
         transfer = await self.repo.get_transfer_by_id(db, transfer_id)

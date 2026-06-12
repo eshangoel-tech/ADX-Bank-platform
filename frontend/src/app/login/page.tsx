@@ -89,7 +89,7 @@ export default function LoginPage() {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.4)", borderTopColor: "transparent" }} />
-                Sending OTP…
+                Continuing…
               </span>
             ) : "Continue →"}
           </button>

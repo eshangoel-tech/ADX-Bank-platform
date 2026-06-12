@@ -12,6 +12,7 @@ from app.schemas.auth import (
     LoginWithPinRequest,
     RegisterRequest,
     RegisterResponse,
+    RequestLoginOTPRequest,
     ResetPasswordRequest,
     VerifyEmailRequest,
     VerifyEmailResponse,
@@ -72,7 +73,20 @@ async def login(
     service = AuthService()
     result = await service.login_user(db, identifier=payload.identifier, password=payload.password)
     data = LoginResponse(**result).model_dump()
-    return ok_response(request, "Login OTP sent to registered email.", data=data)
+    msg = "Proceed to PIN entry." if result["has_pin"] else "Login OTP sent to registered email."
+    return ok_response(request, msg, data=data)
+
+
+@router.post("/request-login-otp")
+async def request_login_otp(
+    request: Request,
+    payload: RequestLoginOTPRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Allows a PIN-based user to request an OTP fallback (e.g. after 3 failed PIN attempts)."""
+    service = AuthService()
+    await service.request_login_otp(db, identifier=payload.identifier, password=payload.password)
+    return ok_response(request, "OTP sent to registered email. Use it to log in.")
 
 
 @router.post("/login-pin")

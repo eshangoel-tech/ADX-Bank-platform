@@ -96,6 +96,7 @@ class WalletService:
 
         # -- Generate topup_id (serves as both the Redis key and OTP reference)
         topup_id = uuid.uuid4()
+        has_pin = bool(user.pin_hash)
 
         # -- Store top-up context in Redis (TTL matches OTP expiry)
         redis = get_redis()
@@ -110,11 +111,76 @@ class WalletService:
             }),
         )
 
-        # -- Generate OTP and persist
+        db.add(
+            self._audit(
+                user_id=user.id,
+                session_id=session_id,
+                event_type="ADD_MONEY_INITIATED",
+                metadata={
+                    "topup_id": str(topup_id),
+                    "amount": str(amount),
+                    "method": "PIN" if has_pin else "OTP",
+                },
+            )
+        )
+
+        if not has_pin:
+            # PIN not set — generate OTP and send email
+            otp_plaintext = generate_otp()
+            otp_hash_value = hash_otp(otp_plaintext)
+            expires_at = datetime.utcnow() + timedelta(minutes=_OTP_TTL_MINUTES)
+            otp_record = OtpVerification(
+                user_id=user.id,
+                otp_hash=otp_hash_value,
+                otp_type="ADD_MONEY",
+                reference_id=topup_id,
+                attempts=0,
+                max_attempts=3,
+                expires_at=expires_at,
+                status="PENDING",
+            )
+            db.add(otp_record)
+            await db.commit()
+            try:
+                await send_otp_email(user.email, otp_plaintext, otp_type="ADD_MONEY")
+            except Exception:
+                logger.exception(
+                    "Failed to send add-money OTP",
+                    extra={"user_id": str(user.id), "topup_id": str(topup_id)},
+                )
+        else:
+            await db.commit()
+
+        return {
+            "topup_id": str(topup_id),
+            "amount": str(amount),
+            "has_pin": has_pin,
+        }
+
+    # ------------------------------------------------------------------
+    # Step 1b: request OTP for an existing topup (PIN-user fallback)
+    # ------------------------------------------------------------------
+
+    async def request_add_money_otp(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        topup_id: UUID,
+    ) -> None:
+        """Create and send an ADD_MONEY OTP for an existing topup — used when PIN user wants OTP fallback."""
+        redis = get_redis()
+        raw = redis.get(self._redis_key(topup_id))
+        if raw is None:
+            raise topup_not_found()
+
+        ctx = json.loads(raw)
+        if ctx["user_id"] != str(user.id):
+            raise topup_not_found()
+
         otp_plaintext = generate_otp()
         otp_hash_value = hash_otp(otp_plaintext)
         expires_at = datetime.utcnow() + timedelta(minutes=_OTP_TTL_MINUTES)
-
         otp_record = OtpVerification(
             user_id=user.id,
             otp_hash=otp_hash_value,
@@ -126,33 +192,14 @@ class WalletService:
             status="PENDING",
         )
         db.add(otp_record)
-        db.add(
-            self._audit(
-                user_id=user.id,
-                session_id=session_id,
-                event_type="ADD_MONEY_INITIATED",
-                metadata={
-                    "topup_id": str(topup_id),
-                    "amount": str(amount),
-                },
-            )
-        )
         await db.commit()
-
-        # -- Send OTP email (best-effort)
         try:
             await send_otp_email(user.email, otp_plaintext, otp_type="ADD_MONEY")
         except Exception:
             logger.exception(
-                "Failed to send add-money OTP",
+                "Failed to send fallback add-money OTP",
                 extra={"user_id": str(user.id), "topup_id": str(topup_id)},
             )
-
-        return {
-            "topup_id": str(topup_id),
-            "amount": str(amount),
-            "message": "OTP sent to your registered email. Valid for 5 minutes.",
-        }
 
     # ------------------------------------------------------------------
     # Step 2: confirm add-money

@@ -32,6 +32,11 @@ export function Navbar() {
     return () => clearInterval(id);
   }, [isAuthenticated]);
 
+  // Instantly clear badge when user is on the notifications page
+  useEffect(() => {
+    if (pathname === "/notifications") setUnread(0);
+  }, [pathname]);
+
   const handleLogout = () => {
     logout();
     router.push("/login");

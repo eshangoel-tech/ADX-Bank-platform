@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.core.auth_dependency import AuthContext, get_current_user
 from app.common.responses import ok_response
 from app.repository.session import get_db
-from app.schemas.wallet import AddMoneyConfirmPinRequest, AddMoneyConfirmRequest, AddMoneyInitiateRequest
+from app.schemas.wallet import AddMoneyConfirmPinRequest, AddMoneyConfirmRequest, AddMoneyInitiateRequest, AddMoneyRequestOTPRequest
 from app.services.core.wallet_service.service import WalletService
 
 router = APIRouter()
@@ -39,7 +39,8 @@ async def initiate_add_money(
         session_id=auth.session_id,
         amount=payload.amount,
     )
-    return ok_response(request, "OTP sent to your registered email.", data=data)
+    msg = "Proceed to PIN entry." if data.get("has_pin") else "OTP sent to your registered email."
+    return ok_response(request, msg, data=data)
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,23 @@ async def confirm_add_money(
         otp=payload.otp,
     )
     return ok_response(request, "Amount credited successfully.", data=data)
+
+
+@router.post("/add-money/request-otp")
+async def request_add_money_otp(
+    request: Request,
+    payload: AddMoneyRequestOTPRequest,
+    auth: AuthContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send an OTP for an existing topup — used when PIN user wants OTP fallback."""
+    service = WalletService()
+    await service.request_add_money_otp(
+        db,
+        user=auth.user,
+        topup_id=uuid.UUID(payload.topup_id),
+    )
+    return ok_response(request, "OTP sent to your registered email.")
 
 
 @router.post("/add-money/confirm-pin")

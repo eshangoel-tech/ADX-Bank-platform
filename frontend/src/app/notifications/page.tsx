@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { api, getErrorMessage } from "@/services/api";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageTransition } from "@/components/PageTransition";
@@ -13,7 +14,6 @@ interface Notification {
   body: string;
   is_read: boolean;
   created_at: string;
-  metadata_?: Record<string, unknown>;
 }
 
 function timeAgo(iso: string): string {
@@ -27,7 +27,6 @@ function timeAgo(iso: string): string {
 
 function NotifIcon({ type }: { type: string }) {
   const t = type?.toUpperCase();
-
   if (t === "CREDIT" || t === "SALARY" || t === "JOINING_BONUS") {
     return (
       <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -58,17 +57,6 @@ function NotifIcon({ type }: { type: string }) {
       </div>
     );
   }
-  if (t === "LOGIN") {
-    return (
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: "var(--accent-muted)", border: "1px solid var(--border-default)" }}>
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--accent)" }}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-        </svg>
-      </div>
-    );
-  }
-  // SYSTEM / fallback
   return (
     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
       style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}>
@@ -83,6 +71,7 @@ function NotificationsContent() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
     api.get("/notifications?limit=50")
@@ -92,10 +81,24 @@ function NotificationsContent() {
       })
       .catch((err) => setError(getErrorMessage(err)))
       .finally(() => setLoading(false));
-
-    // Auto-mark all as read when user lands on this page
-    api.post("/notifications/mark-read").catch(() => {});
   }, []);
+
+  const dismiss = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      await api.post("/notifications/mark-read");
+      // Animate out all notifications
+      setNotifications([]);
+    } catch {
+      // silent
+    } finally {
+      setMarkingAll(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,51 +109,118 @@ function NotificationsContent() {
   }
   if (error) return <div className="error-box">{error}</div>;
 
-  if (notifications.length === 0) {
-    return (
-      <div className="max-w-md mx-auto">
-        <div className="card text-center py-16 space-y-3">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto"
-            style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}>
-            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </div>
-          <p className="font-semibold" style={{ color: "var(--text-primary)" }}>No notifications yet</p>
-          <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>Transfers, salary credits, and money requests will appear here.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-lg space-y-2">
-      {notifications.map((n) => (
-        <div
-          key={n.id}
-          className="flex items-start gap-3 p-4 rounded-xl transition-all duration-150"
-          style={{
-            backgroundColor: n.is_read ? "var(--bg-card)" : "var(--bg-elevated)",
-            border: `1px solid ${n.is_read ? "var(--border-subtle)" : "var(--border-default)"}`,
-          }}
-        >
-          <NotifIcon type={n.type} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
-                {n.title}
-                {!n.is_read && (
-                  <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ backgroundColor: "var(--accent)" }} />
-                )}
-              </p>
-              <span className="text-xs shrink-0 mt-0.5" style={{ color: "var(--text-tertiary)" }}>
-                {timeAgo(n.created_at)}
-              </span>
+    <div className="max-w-lg space-y-3">
+      {/* Header row */}
+      <AnimatePresence>
+        {notifications.length > 0 && (
+          <motion.div
+            key="header"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center justify-between"
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-tertiary)" }}>
+              {notifications.length} notification{notifications.length !== 1 ? "s" : ""}
+            </p>
+            <button
+              onClick={handleMarkAllRead}
+              disabled={markingAll}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: "var(--accent)", backgroundColor: "var(--accent-muted)", border: "1px solid var(--border-default)" }}
+            >
+              {markingAll ? <Spinner size={12} /> : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              Mark all read
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Notification list */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {notifications.length === 0 && !loading ? (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.25 }}
+            className="card text-center py-16 space-y-3"
+          >
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto"
+              style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}>
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
             </div>
-            <p className="text-sm mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{n.body}</p>
-          </div>
-        </div>
-      ))}
+            <p className="font-semibold" style={{ color: "var(--text-primary)" }}>All caught up</p>
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>Transfers, salary credits, and money requests will appear here.</p>
+          </motion.div>
+        ) : (
+          notifications.map((n, i) => (
+            <motion.div
+              key={n.id}
+              layout
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 40, scale: 0.95 }}
+              transition={{
+                layout: { duration: 0.2 },
+                opacity: { duration: 0.22, delay: i * 0.04 },
+                y: { duration: 0.22, delay: i * 0.04 },
+                scale: { duration: 0.18 },
+              }}
+              className="flex items-start gap-3 p-4 rounded-xl group"
+              style={{
+                backgroundColor: n.is_read ? "var(--bg-card)" : "var(--bg-elevated)",
+                border: `1px solid ${n.is_read ? "var(--border-subtle)" : "var(--border-default)"}`,
+              }}
+            >
+              <NotifIcon type={n.type} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
+                    {n.title}
+                    {!n.is_read && (
+                      <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ backgroundColor: "var(--accent)" }} />
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      {timeAgo(n.created_at)}
+                    </span>
+                    {/* Dismiss button */}
+                    <button
+                      onClick={() => dismiss(n.id)}
+                      className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center transition-all duration-150 cursor-pointer"
+                      style={{ color: "var(--text-tertiary)" }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.color = "var(--danger)";
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(239,68,68,0.08)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)";
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                      }}
+                      aria-label="Dismiss"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{n.body}</p>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </AnimatePresence>
     </div>
   );
 }

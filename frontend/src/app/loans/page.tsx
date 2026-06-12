@@ -120,7 +120,6 @@ function EligibilityStep({ onNext }: { onNext: (data: EligibilityData) => void }
       const { data: res } = await api.get("/loan/eligibility");
       const d: EligibilityData = res?.data ?? res;
       setData(d);
-      setTimeout(() => onNext(d), 1800);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -152,10 +151,9 @@ function EligibilityStep({ onNext }: { onNext: (data: EligibilityData) => void }
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>You're eligible for a loan!</p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>Taking you to the simulator…</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>You&apos;re eligible for a loan!</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>Review your limits below, then continue.</p>
               </div>
-              <Spinner size={16} />
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
@@ -170,6 +168,9 @@ function EligibilityStep({ onNext }: { onNext: (data: EligibilityData) => void }
                 </div>
               ))}
             </div>
+            <button onClick={() => onNext(data)} className="btn-primary w-full cursor-pointer">
+              Continue to Simulator →
+            </button>
           </motion.div>
         </AnimatePresence>
       )}
@@ -463,14 +464,16 @@ function ManageLoansPanel() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get("/loan/my-loans");
-      setLoans(data?.data ?? data ?? []);
+      const { data } = await api.get("/loan/list");
+      setLoans(data?.data?.loans ?? data?.loans ?? data?.data ?? data ?? []);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => { fetchLoans(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePayEmi = async (loan: LoanRecord) => {
     setSelectedLoan(loan);
@@ -496,7 +499,7 @@ function ManageLoansPanel() {
           <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>View loans and pay monthly EMIs.</p>
         </div>
         <button onClick={fetchLoans} disabled={loading} className="btn-primary cursor-pointer">
-          {loading ? <span className="flex items-center gap-2"><Spinner size={16} /> Loading…</span> : "Refresh Loans"}
+          {loading ? <span className="flex items-center gap-2"><Spinner size={16} /> Loading…</span> : "Refresh"}
         </button>
       </div>
       {error && <div className="error-box">{error}</div>}
@@ -557,7 +560,7 @@ function ManageLoansPanel() {
             <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p className="text-sm">No loans yet. Click Refresh Loans to load.</p>
+            <p className="text-sm">No active loans. Apply for one above.</p>
           </div>
         )
       )}
@@ -618,7 +621,15 @@ function LoansContent() {
                       onBooked={(id) => { setBookingId(id); advance(); }} />
                   )}
                   {wizardStep === 3 && (
-                    <ConfirmStep prefillBookingId={bookingId} onConfirmed={() => setSection("manage")} />
+                    <ConfirmStep prefillBookingId={bookingId} onConfirmed={() => {
+                      setWizardStep(0);
+                      setCompletedUpTo(0);
+                      setEligibilityData(null);
+                      setBookingId("");
+                      setPrefillAmount("");
+                      setPrefillTenure("");
+                      setSection("manage");
+                    }} />
                   )}
                 </div>
               </>

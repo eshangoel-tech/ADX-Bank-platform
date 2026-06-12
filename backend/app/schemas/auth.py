@@ -82,6 +82,12 @@ class LoginWithPinRequest(BaseModel):
     pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+class RequestLoginOTPRequest(BaseModel):
+    """Sent by frontend when PIN user explicitly requests OTP fallback."""
+    identifier: str = Field(..., min_length=1, max_length=150)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
 # ---------------------------------------------------------------------------
 # Forgot password
 # ---------------------------------------------------------------------------

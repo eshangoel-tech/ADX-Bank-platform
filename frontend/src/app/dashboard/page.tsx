@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { api, getErrorMessage } from "@/services/api";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageTransition } from "@/components/PageTransition";
@@ -131,11 +131,74 @@ function useCountUp(target: number, duration = 1200) {
   return count;
 }
 
+function WelcomeOverlay({ name }: { name: string }) {
+  return (
+    <motion.div
+      key="welcome-overlay"
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ backgroundColor: "var(--bg-base)", zIndex: 100 }}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.6, ease: "easeInOut" } }}
+    >
+      <div className="text-center space-y-4">
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, type: "spring", stiffness: 180, damping: 14 }}
+          className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center"
+          style={{ backgroundColor: "var(--accent-muted)", border: "1px solid var(--border-default)" }}
+        >
+          <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--accent)" }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+          </svg>
+        </motion.div>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="text-xs uppercase tracking-[0.2em] font-semibold"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          Welcome back
+        </motion.p>
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="font-display font-bold"
+          style={{ fontSize: "clamp(1.8rem, 5vw, 2.5rem)", color: "var(--text-primary)" }}
+        >
+          {name || "Loading…"}
+        </motion.h1>
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{ delay: 0.7, duration: 0.5, ease: "easeOut" }}
+          className="mx-auto h-0.5 w-16 rounded-full"
+          style={{ backgroundColor: "var(--accent)" }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 function DashboardContent() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    const flag = sessionStorage.getItem("adx_show_welcome");
+    if (flag) {
+      sessionStorage.removeItem("adx_show_welcome");
+      setShowWelcome(true);
+      const t = setTimeout(() => setShowWelcome(false), 2600);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   useEffect(() => {
     api
@@ -148,7 +211,9 @@ function DashboardContent() {
   const balance = data ? parseFloat(data.account.balance) : 0;
   const animatedBalance = useCountUp(balance, 1000);
 
-  if (loading) {
+  const firstName = data?.user?.full_name?.split(" ")[0] ?? "";
+
+  if (loading && !showWelcome) {
     return (
       <div className="flex items-center justify-center py-24 gap-3" style={{ color: "var(--text-secondary)" }}>
         <Spinner size={20} />
@@ -160,6 +225,10 @@ function DashboardContent() {
   if (error) return <div className="error-box">{error}</div>;
 
   return (
+    <>
+      <AnimatePresence>
+        {showWelcome && <WelcomeOverlay name={firstName} />}
+      </AnimatePresence>
     <PageTransition>
       <div className="space-y-8">
 
@@ -352,6 +421,7 @@ function DashboardContent() {
         )}
       </div>
     </PageTransition>
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getErrorMessage } from "@/services/api";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -18,35 +18,48 @@ const BANKS = [
   { id: "yes",   name: "Yes Bank",   color: "#004B8E" },
 ];
 
-type FakePayStep = "bank" | "netbanking" | "otp" | "pin";
+type FakePayStep = "bank" | "netbanking" | "pin" | "otp";
 
 interface FakePayProps {
   amount: string;
   topupId: string;
+  hasPin: boolean;
   onSuccess: () => void;
   onClose: () => void;
 }
 
-function FakePayModal({ amount, topupId, onSuccess, onClose }: FakePayProps) {
+function FakePayModal({ amount, topupId, hasPin, onSuccess, onClose }: FakePayProps) {
+  // If user has no PIN, go straight to OTP mode; otherwise default to PIN
   const [step, setStep] = useState<FakePayStep>("bank");
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [userId, setUserId] = useState("");
   const [nbPassword, setNbPassword] = useState("");
-  const [fakeOtp, setFakeOtp] = useState("");
   const [pin, setPin] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoOtpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [requestingOtp, setRequestingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(!hasPin); // already sent during initiate for no-pin users
 
-  // Auto-fill decorative OTP after 1.5s to simulate real gateway
-  useEffect(() => {
-    if (step === "otp") {
-      autoOtpTimer.current = setTimeout(() => {
-        setFakeOtp("748291");
-      }, 1500);
+  const handleNetBankingLogin = () => {
+    // Go to PIN if user has PIN, else to OTP (already sent during initiate)
+    setStep(hasPin ? "pin" : "otp");
+  };
+
+  const handleRequestOtp = async () => {
+    setRequestingOtp(true);
+    setError(null);
+    try {
+      await api.post("/wallet/add-money/request-otp", { topup_id: topupId });
+      setOtpSent(true);
+      setPin("");
+      setStep("otp");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setRequestingOtp(false);
     }
-    return () => { if (autoOtpTimer.current) clearTimeout(autoOtpTimer.current); };
-  }, [step]);
+  };
 
   const handleConfirmPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,11 +76,26 @@ function FakePayModal({ amount, topupId, onSuccess, onClose }: FakePayProps) {
     }
   };
 
+  const handleConfirmOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length < 6) { setError("Enter the 6-digit OTP."); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      await api.post("/wallet/add-money/confirm", { topup_id: topupId, otp });
+      onSuccess();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const stepTitles: Record<FakePayStep, string> = {
     bank: "Select your bank",
     netbanking: "Net Banking Login",
-    otp: "OTP Verification",
     pin: "Authorize Payment",
+    otp: "OTP Verification",
   };
 
   return (
@@ -183,38 +211,8 @@ function FakePayModal({ amount, topupId, onSuccess, onClose }: FakePayProps) {
                 </p>
                 <div className="flex gap-2.5 mt-4">
                   <button type="button" onClick={() => setStep("bank")} className="btn-secondary flex-1 text-sm cursor-pointer">Back</button>
-                  <button type="button" onClick={() => setStep("otp")} className="btn-primary flex-1 text-sm cursor-pointer">Login →</button>
+                  <button type="button" onClick={handleNetBankingLogin} className="btn-primary flex-1 text-sm cursor-pointer">Login →</button>
                 </div>
-              </motion.div>
-            )}
-
-            {/* OTP (decorative, auto-filled) */}
-            {step === "otp" && (
-              <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-                <div className="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 mb-4"
-                  style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}>
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "var(--accent)" }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>OTP sent to your registered mobile</p>
-                </div>
-                <div>
-                  <label className="label">Bank OTP</label>
-                  <input className="input tracking-[0.5em] text-center text-lg font-bold font-mono" type="text"
-                    value={fakeOtp} onChange={(e) => setFakeOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="• • • • • •" maxLength={6} />
-                  {!fakeOtp && (
-                    <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: "var(--text-tertiary)" }}>
-                      <span className="w-3 h-3 border border-t-transparent rounded-full animate-spin inline-block"
-                        style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-                      Auto-filling OTP…
-                    </p>
-                  )}
-                </div>
-                <button type="button" disabled={fakeOtp.length < 6} onClick={() => setStep("pin")}
-                  className="btn-primary w-full mt-4 cursor-pointer text-sm">
-                  Verify OTP →
-                </button>
               </motion.div>
             )}
 
@@ -240,6 +238,55 @@ function FakePayModal({ amount, topupId, onSuccess, onClose }: FakePayProps) {
                       : `Pay ₹${parseFloat(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
                   </button>
                 </form>
+                {/* Forgot PIN fallback */}
+                <button
+                  type="button"
+                  onClick={handleRequestOtp}
+                  disabled={requestingOtp}
+                  className="w-full mt-3 py-2 text-sm font-medium cursor-pointer transition-colors duration-150"
+                  style={{ color: "var(--text-tertiary)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--accent)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)"; }}
+                >
+                  {requestingOtp
+                    ? <span className="flex items-center justify-center gap-2"><Spinner size={12} />Sending OTP…</span>
+                    : "Forgot PIN? Use OTP instead"}
+                </button>
+              </motion.div>
+            )}
+
+            {/* OTP step — real verification */}
+            {step === "otp" && (
+              <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
+                {otpSent && (
+                  <div className="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 mb-4"
+                    style={{ backgroundColor: "var(--accent-muted)", border: "1px solid var(--border-default)" }}>
+                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "var(--accent)" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm" style={{ color: "var(--accent-hover)" }}>OTP sent to your registered email.</p>
+                  </div>
+                )}
+                <form onSubmit={handleConfirmOtp} className="space-y-4">
+                  <div>
+                    <label className="label">OTP (6 digits)</label>
+                    <input
+                      className="input tracking-[0.5em] text-center text-lg font-bold font-mono"
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="• • • • • •"
+                      maxLength={6}
+                      autoFocus
+                    />
+                  </div>
+                  {error && <p className="error-box">{error}</p>}
+                  <button type="submit" disabled={loading || otp.length < 6} className="btn-primary w-full cursor-pointer">
+                    {loading
+                      ? <span className="flex items-center justify-center gap-2"><Spinner size={16} />Verifying…</span>
+                      : `Verify & Pay ₹${parseFloat(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+                  </button>
+                </form>
               </motion.div>
             )}
 
@@ -255,6 +302,7 @@ function WalletContent() {
   const [done, setDone] = useState(false);
   const [amount, setAmount] = useState("");
   const [topupId, setTopupId] = useState("");
+  const [hasPin, setHasPin] = useState(false);
   const [addedAmount, setAddedAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +316,7 @@ function WalletContent() {
       const { data } = await api.post("/wallet/add-money/initiate", { amount: parseFloat(amount) });
       const d = data?.data ?? data;
       setTopupId(d?.topup_id);
+      setHasPin(d?.has_pin ?? false);
       setAddedAmount(amount);
       setShowFakePay(true);
     } catch (err) {
@@ -364,6 +413,7 @@ function WalletContent() {
           <FakePayModal
             amount={addedAmount}
             topupId={topupId}
+            hasPin={hasPin}
             onSuccess={() => { setShowFakePay(false); setDone(true); }}
             onClose={() => setShowFakePay(false)}
           />

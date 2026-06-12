@@ -235,19 +235,27 @@ function FeaturesSection() {
           {FEATURES.map((f, i) => (
             <motion.div
               key={f.title}
-              className="rounded-2xl p-5"
+              className="rounded-2xl p-5 cursor-pointer"
               style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
               initial={reduced ? false : { opacity: 0, y: 16 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.35, delay: i * 0.06, ease: [0.25, 0.1, 0.25, 1] }}
-              whileHover={reduced ? {} : { y: -3, boxShadow: "0 8px 30px rgba(8,145,178,0.08)" }}
+              whileHover={reduced ? {} : {
+                y: -6,
+                scale: 1.02,
+                borderColor: f.accent,
+                boxShadow: `0 12px 36px rgba(0,0,0,0.25), 0 0 0 1px ${f.accent}22`,
+                transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+              }}
             >
-              <div
+              <motion.div
                 className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
                 style={{ backgroundColor: "var(--accent-muted)", color: f.accent }}
+                whileHover={reduced ? {} : { scale: 1.1, backgroundColor: `${f.accent}22` }}
+                transition={{ duration: 0.2 }}
               >
                 {f.icon}
-              </div>
+              </motion.div>
               <h3 className="font-display text-base font-bold mb-1.5" style={{ color: "var(--text-primary)" }}>
                 {f.title}
               </h3>
@@ -283,13 +291,15 @@ export default function LandingPage() {
       <AnimatePresence>
         {starToast && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 left-1/2 z-[100] -translate-x-1/2 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl"
-            style={{ backgroundColor: "#1c1f2e", border: "1px solid rgba(245,158,11,0.4)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className="fixed top-20 z-[100] px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl whitespace-nowrap"
+            style={{ left: "50%", backgroundColor: "#1c1f2e", border: "1px solid rgba(245,158,11,0.4)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}
           >
-            <span className="text-xl">⭐</span>
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="#fbbf24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
             <div>
               <p className="text-sm font-bold" style={{ color: "#fbbf24" }}>If you liked it, give a star!</p>
               <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>Redirecting to GitHub…</p>

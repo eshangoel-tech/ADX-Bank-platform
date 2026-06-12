@@ -37,3 +37,7 @@ class AddMoneyConfirmResponse(BaseModel):
 class AddMoneyConfirmPinRequest(BaseModel):
     topup_id: str = Field(..., min_length=36, max_length=36, description="UUID from initiate")
     pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="6-digit ADX PIN")
+
+
+class AddMoneyRequestOTPRequest(BaseModel):
+    topup_id: str = Field(..., min_length=36, max_length=36, description="UUID from initiate")
