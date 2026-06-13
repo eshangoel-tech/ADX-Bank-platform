@@ -55,6 +55,14 @@ class TransferRepository:
         )
         return res.scalar_one_or_none()
 
+    async def get_account_by_id(
+        self, db: AsyncSession, account_id: UUID
+    ) -> Optional[Account]:
+        res = await db.execute(
+            select(Account).where(Account.id == account_id)
+        )
+        return res.scalar_one_or_none()
+
     async def get_account_for_update(
         self, db: AsyncSession, account_id: UUID
     ) -> Optional[Account]:

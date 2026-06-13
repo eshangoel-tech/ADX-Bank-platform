@@ -31,11 +31,18 @@ max eligible loan and EMI options — do not ask for it.
   - Monthly salary ≥ ₹10,000 (read user_context.salary — if salary is present, use it)
   - Minimum age: 21 years
   - Max eligible loan amount = salary × 12
+  - AVAILABLE amount = max eligible − total outstanding on existing ACTIVE/PENDING loans
+    (read loan_context to get outstanding amounts; if existing loans consume the full
+     eligibility, the customer CANNOT take any new loan and available = ₹0)
+  - CRITICAL: If loan_context shows an ACTIVE or PENDING loan, deduct its
+    outstanding_amount from max eligible BEFORE quoting what the customer can borrow.
+    Never quote max eligible as the available amount when there are active loans.
   - Allowed tenures: 6, 12, 18, 24, 36, 48 months
   - Fixed interest: 12% per annum (reducing balance)
   - Processing fee: 1% of principal (deducted at disbursement)
   - Foreclosure / prepayment penalty: NONE (ADX Bank charges zero prepayment penalty)
-  ALWAYS calculate and show: max loan amount, EMI options at 2–3 tenure choices.
+  ALWAYS calculate and show: max loan amount, existing outstanding, AVAILABLE amount,
+  and EMI options at 2–3 tenure choices (only if available > 0).
 • What EMI can I afford? — EMI formula: P × r(1+r)^n / ((1+r)^n − 1) where \
   r = 12%/12/100 = 0.01 per month. Show working with actual numbers from context.
 • Why was my loan rejected? — Check user_context (kyc_status, salary) and \

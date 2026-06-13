@@ -271,7 +271,7 @@ function PipelineSection() {
         </div>
 
         {/* Single connector line + icons — absolute line means icons are always centred in their column */}
-        <div className="relative flex flex-col md:flex-row items-start">
+        <div className="relative grid grid-cols-2 gap-y-8 gap-x-4 md:flex md:flex-row md:gap-0 items-start">
 
           {/* Shared horizontal rail — spans from centre of col-1 to centre of col-4 */}
           <div

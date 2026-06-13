@@ -86,13 +86,13 @@ function TransactionsContent() {
                     }
                   </svg>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-200">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-200 truncate">
                     {tx.description || REF_LABELS[tx.reference_type] || tx.reference_type}
                   </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-500">{new Date(tx.created_at).toLocaleString()}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 font-mono">
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-slate-500 shrink-0">{new Date(tx.created_at).toLocaleString()}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 font-mono shrink-0">
                       {REF_LABELS[tx.reference_type] ?? tx.reference_type}
                     </span>
                   </div>

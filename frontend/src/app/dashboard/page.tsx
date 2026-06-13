@@ -262,11 +262,11 @@ function DashboardContent() {
                     {data.account.account_number_masked}
                   </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+                <div className="text-right shrink-0 min-w-0 max-w-[45%]">
+                  <p className="text-base font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                     {data.user.full_name}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-tertiary)" }}>
                     {data.user.email}
                   </p>
                   <span

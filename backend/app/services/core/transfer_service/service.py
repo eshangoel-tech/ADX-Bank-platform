@@ -288,6 +288,13 @@ class TransferService:
             await db.commit()
             raise insufficient_balance()
 
+        # Fetch names for human-readable ledger descriptions
+        receiver_acc = await self.repo.get_account_by_id(db, transfer.receiver_account_id)
+        sender_user_obj = await self.repo.get_user_by_id(db, sender.user_id)
+        receiver_user_obj = await self.repo.get_user_by_id(db, receiver_acc.user_id) if receiver_acc else None
+        receiver_display = receiver_user_obj.full_name if receiver_user_obj else "Unknown"
+        sender_display = sender_user_obj.full_name if sender_user_obj else "Unknown"
+
         # Deduct from sender
         new_sender_balance = sender.balance - transfer.amount
         await self.repo.set_account_balance(
@@ -308,7 +315,7 @@ class TransferService:
             balance_after=new_sender_balance,
             reference_type="TRANSFER",
             reference_id=transfer.id,
-            description=f"Transfer to account {transfer.receiver_account_id}",
+            description=f"Transfer to {receiver_display}",
         )
 
         # Ledger: CREDIT entry for receiver
@@ -320,7 +327,7 @@ class TransferService:
             balance_after=new_receiver_balance,
             reference_type="TRANSFER",
             reference_id=transfer.id,
-            description=f"Transfer from account {transfer.sender_account_id}",
+            description=f"Transfer from {sender_display}",
         )
 
         # Finalise transfer and OTP

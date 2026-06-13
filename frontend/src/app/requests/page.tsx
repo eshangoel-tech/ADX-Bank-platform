@@ -81,15 +81,15 @@ function RequestCard({ req, onAction }: { req: MoneyRequest; onAction: () => voi
             style={{ backgroundColor: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--border-default)" }}>
             {req.other_name?.charAt(0)?.toUpperCase() ?? "?"}
           </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{req.other_name}</p>
-            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{req.other_name}</p>
+            <p className="text-xs truncate" style={{ color: "var(--text-tertiary)" }}>
               {isIncoming ? "requested from you" : "you requested from them"} · {timeAgo(req.created_at)}
             </p>
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="font-display text-lg font-bold" style={{ color: isIncoming ? "var(--danger)" : "var(--gold)" }}>
+          <p className="font-display text-base sm:text-lg font-bold" style={{ color: isIncoming ? "var(--danger)" : "var(--gold)" }}>
             {isIncoming ? "-" : "+"}₹{parseFloat(req.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </p>
           <span className="text-xs px-2 py-0.5 rounded-full font-semibold"

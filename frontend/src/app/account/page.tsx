@@ -233,7 +233,7 @@ function AccountContent() {
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide font-semibold block mb-2" style={{ color: "var(--text-tertiary)" }}>Address</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">City</label>
                 <input className="input" type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai" />

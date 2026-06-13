@@ -156,7 +156,7 @@ function EligibilityStep({ onNext }: { onNext: (data: EligibilityData) => void }
                 <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>Review your limits below, then continue.</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { label: "Max Amount", value: `₹${inr(parseFloat(data.max_eligible_amount))}` },
                 { label: "Interest Rate", value: `${data.interest_rate}% p.a.` },
@@ -554,15 +554,15 @@ function ManageLoansPanel() {
                       <span className={STATUS_BADGE[loan.status] ?? "badge-gray"}>{loan.status}</span>
                     </div>
 
-                    <div className="mt-2 grid grid-cols-3 gap-2">
+                    <div className="mt-2 grid grid-cols-3 gap-1 sm:gap-2">
                       {[
                         { label: "EMI", value: `₹${emiAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` },
                         { label: "Outstanding", value: `₹${outstanding.toLocaleString("en-IN", { maximumFractionDigits: 0 })}` },
                         { label: "Tenure", value: `${loan.tenure_months}mo @ ${loan.interest_rate}%` },
                       ].map((item) => (
-                        <div key={item.label}>
+                        <div key={item.label} className="min-w-0">
                           <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-tertiary)" }}>{item.label}</p>
-                          <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{item.value}</p>
+                          <p className="text-xs sm:text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{item.value}</p>
                         </div>
                       ))}
                     </div>
