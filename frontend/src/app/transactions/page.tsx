@@ -22,6 +22,18 @@ const REF_LABELS: Record<string, string> = {
   JOINING_BONUS: "Joining Bonus",
 };
 
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+function cleanDesc(desc: string, refType: string): string {
+  if (!desc) return REF_LABELS[refType] ?? refType;
+  if (UUID_RE.test(desc)) {
+    const lower = desc.toLowerCase();
+    if (lower.startsWith("transfer to")) return "Outgoing Transfer";
+    if (lower.startsWith("transfer from")) return "Incoming Transfer";
+    return REF_LABELS[refType] ?? "Transfer";
+  }
+  return desc;
+}
+
 function TransactionsContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [page, setPage] = useState(1);
@@ -88,7 +100,7 @@ function TransactionsContent() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-200 truncate">
-                    {tx.description || REF_LABELS[tx.reference_type] || tx.reference_type}
+                    {cleanDesc(tx.description, tx.reference_type)}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-slate-500 shrink-0">{new Date(tx.created_at).toLocaleString()}</span>

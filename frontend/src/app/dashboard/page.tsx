@@ -30,6 +30,18 @@ interface DashboardData {
   }>;
 }
 
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+function cleanDesc(desc: string, refType: string): string {
+  if (!desc) return refType;
+  if (UUID_RE.test(desc)) {
+    const lower = desc.toLowerCase();
+    if (lower.startsWith("transfer to")) return "Outgoing Transfer";
+    if (lower.startsWith("transfer from")) return "Incoming Transfer";
+    return "Transfer";
+  }
+  return desc;
+}
+
 const FEATURES = [
   {
     href: "/transfer",
@@ -392,7 +404,7 @@ function DashboardContent() {
                       </div>
                       <div>
                         <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                          {tx.description || tx.reference_type}
+                          {cleanDesc(tx.description, tx.reference_type)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
                           {new Date(tx.created_at).toLocaleString()}
