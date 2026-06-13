@@ -496,6 +496,12 @@ class TransferService:
             await db.commit()
             raise insufficient_balance()
 
+        receiver_acc_pin = await self.repo.get_account_by_id(db, transfer.receiver_account_id)
+        sender_user_pin = await self.repo.get_user_by_id(db, sender.user_id)
+        receiver_user_pin = await self.repo.get_user_by_id(db, receiver_acc_pin.user_id) if receiver_acc_pin else None
+        receiver_name_pin = receiver_user_pin.full_name if receiver_user_pin else "Unknown"
+        sender_name_pin = sender_user_pin.full_name if sender_user_pin else "Unknown"
+
         new_sender_balance = sender.balance - transfer.amount
         await self.repo.set_account_balance(db, transfer.sender_account_id, new_sender_balance)
         new_receiver_balance = await self.repo.credit_account_balance(
@@ -506,13 +512,13 @@ class TransferService:
             db, account_id=transfer.sender_account_id, entry_type="DEBIT",
             amount=transfer.amount, balance_after=new_sender_balance,
             reference_type="TRANSFER", reference_id=transfer.id,
-            description=f"Transfer to account {transfer.receiver_account_id}",
+            description=f"Transfer to {receiver_name_pin}",
         )
         await self.repo.create_ledger_entry(
             db, account_id=transfer.receiver_account_id, entry_type="CREDIT",
             amount=transfer.amount, balance_after=new_receiver_balance,
             reference_type="TRANSFER", reference_id=transfer.id,
-            description=f"Transfer from account {transfer.sender_account_id}",
+            description=f"Transfer from {sender_name_pin}",
         )
 
         await self.repo.update_transfer_status(db, transfer_id, "COMPLETED", completed_at=datetime.utcnow())
