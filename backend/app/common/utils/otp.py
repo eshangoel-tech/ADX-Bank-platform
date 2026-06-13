@@ -26,6 +26,10 @@ SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@adxbank.com")
 SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "ADX Bank")
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+# From address for Resend — must be from a Resend-verified domain.
+# Default uses Resend's shared domain (works without custom domain setup).
+RESEND_FROM: str = os.getenv("RESEND_FROM", f"ADX Bank <onboarding@resend.dev>")
 
 # ---------------------------------------------------------------------------
 # Shared disclaimer — appended to every email
@@ -79,15 +83,39 @@ def verify_otp_hash(otp: str, stored_hash: str) -> bool:
 # ---------------------------------------------------------------------------
 
 async def _send(msg: MIMEMultipart) -> None:
-    """Send a pre-built MIME message via SMTP STARTTLS."""
-    await aiosmtplib.send(
-        msg,
-        hostname=SMTP_HOST,
-        port=SMTP_PORT,
-        username=SMTP_USER or None,
-        password=SMTP_PASSWORD or None,
-        start_tls=True,
-    )
+    """Send via Resend API if key is set, otherwise fall back to SMTP STARTTLS."""
+    if RESEND_API_KEY:
+        await _send_via_resend(msg)
+    else:
+        await aiosmtplib.send(
+            msg,
+            hostname=SMTP_HOST,
+            port=SMTP_PORT,
+            username=SMTP_USER or None,
+            password=SMTP_PASSWORD or None,
+            start_tls=True,
+        )
+
+
+async def _send_via_resend(msg: MIMEMultipart) -> None:
+    import httpx
+    html_body = ""
+    for part in msg.get_payload():
+        if hasattr(part, "get_content_type") and part.get_content_type() == "text/html":
+            html_body = part.get_payload(decode=True).decode("utf-8")
+            break
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={
+                "from": RESEND_FROM,
+                "to": [msg["To"]],
+                "subject": msg["Subject"],
+                "html": html_body,
+            },
+        )
+        resp.raise_for_status()
 
 
 # ---------------------------------------------------------------------------
