@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageTransition } from "@/components/PageTransition";
 import { PinInput } from "@/components/PinInput";
 import { Spinner } from "@/components/Spinner";
+import { AnimatedCheckmark } from "@/components/AnimatedCheckmark";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function calcEMI(principal: number, annualRatePct: number, months: number): number {
@@ -406,10 +407,7 @@ function ConfirmStep({ prefillBookingId, onConfirmed }: { prefillBookingId: stri
     return (
       <motion.div className="text-center space-y-4 py-6" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
         <div className="flex justify-center">
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <circle cx="32" cy="32" r="25" stroke="var(--success)" strokeWidth="3" className="success-circle" style={{ fill: "rgba(16,185,129,0.08)" }} />
-            <path d="M20 33l8 8 16-16" stroke="var(--success)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="success-check" />
-          </svg>
+          <AnimatedCheckmark size={72} />
         </div>
         <p className="font-display text-lg font-bold" style={{ color: "var(--success)" }}>Loan Approved!</p>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Redirecting to your loans…</p>
