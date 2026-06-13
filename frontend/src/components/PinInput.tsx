@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, KeyboardEvent, ClipboardEvent } from "react";
+import { useRef, useState, KeyboardEvent, ClipboardEvent } from "react";
 
 interface PinInputProps {
   value: string;
@@ -11,6 +11,7 @@ interface PinInputProps {
 
 export function PinInput({ value, onChange, disabled, autoFocus }: PinInputProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   const handleChange = (index: number, char: string) => {
     const digit = char.replace(/\D/g, "").slice(-1);
@@ -67,17 +68,23 @@ export function PinInput({ value, onChange, disabled, autoFocus }: PinInputProps
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => { e.target.select(); setFocusedIndex(i); }}
+            onBlur={() => setFocusedIndex(null)}
             aria-label={`PIN digit ${i + 1}`}
             className="w-11 h-14 rounded-xl text-center text-xl font-bold outline-none transition-all duration-150 cursor-text"
             style={{
-              backgroundColor: "var(--bg-elevated)",
-              border: filled
+              backgroundColor: focusedIndex === i ? "var(--bg-card)" : "var(--bg-elevated)",
+              border: focusedIndex === i
                 ? "2px solid var(--accent)"
-                : "2px solid var(--border-default)",
+                : filled
+                  ? "2px solid var(--accent)"
+                  : "2px solid var(--border-default)",
               color: "var(--text-primary)",
-              boxShadow: filled ? "0 0 0 3px var(--accent-muted)" : "none",
+              boxShadow: focusedIndex === i
+                ? "0 0 0 3px var(--accent-muted), 0 0 12px var(--accent-glow)"
+                : filled ? "0 0 0 3px var(--accent-muted)" : "none",
               caretColor: "transparent",
+              transform: focusedIndex === i ? "scale(1.08)" : "scale(1)",
             }}
           />
         );

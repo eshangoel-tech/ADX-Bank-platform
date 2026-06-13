@@ -70,7 +70,7 @@
     "default_trigger_overdue_days": 30,
     "foreclosure_fee_percent": 2,
     "foreclosure_fee": "2% of outstanding principal charged on loan foreclosure/full prepayment",
-    "description": "Personal loans at 12% p.a. fixed reducing-balance interest. Maximum eligible loan = 12× monthly salary (e.g. ₹10,000 salary → max ₹1,20,000). Tenure 1–24 months. A 1% processing fee is charged on the principal at disbursement. Minimum KYC-verified salary ₹10,000/month and minimum age 21. Loan booking ID valid for 5 minutes; OTP required to confirm. EMI calculated using the standard reducing-balance formula. Account is tagged as Default after 30 days overdue and NPA after 90 days."
+    "description": "Personal loans at 12% p.a. fixed reducing-balance interest. Maximum eligible loan = 12× monthly salary (e.g. ₹10,000 salary → max ₹1,20,000). Tenures available: 6, 12, 18, 24, 36, 48 months. A 1% processing fee is charged on the principal at disbursement. A 2% foreclosure fee applies on outstanding principal for early full payoff. Minimum KYC-verified salary ₹10,000/month and minimum age 21. Loan booking ID valid for 5 minutes; OTP required to confirm. EMI calculated using the standard reducing-balance formula. Account is tagged as Default after 30 days overdue and NPA after 90 days."
   },
 
   "account": {
@@ -110,7 +110,7 @@
     "loan_processing_fee_example": "1% of ₹1,00,000 loan = ₹1,000 deducted at disbursement",
     "foreclosure_fee_percent": 2,
     "foreclosure_fee": "2% of outstanding principal",
-    "description": "ADX Bank charges ZERO fees for account opening, fund transfers, and add-money transactions. Loans carry a 1% processing fee on the principal, deducted at disbursement. No foreclosure or prepayment penalty is currently levied."
+    "description": "ADX Bank charges ZERO fees for account opening, fund transfers, and add-money transactions. Loans carry a 1% processing fee on the principal, deducted at disbursement. A 2% foreclosure fee is charged on the outstanding principal if you choose to pay off the loan early in full."
   },
 
   "support": {

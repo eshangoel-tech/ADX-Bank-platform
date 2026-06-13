@@ -144,7 +144,7 @@ class TransferService:
         if sender_account.balance < amount:
             raise insufficient_balance()
 
-        # -- Create transfer + OTP atomically
+        # -- Create transfer + OTP atomically (OTP row always created for fallback)
         otp_plaintext = generate_otp()
         otp_hash_value = hash_otp(otp_plaintext)
         expires_at = datetime.utcnow() + timedelta(minutes=_OTP_TTL_MINUTES)
@@ -176,14 +176,17 @@ class TransferService:
         )
         await db.commit()
 
-        # -- Send OTP email (best-effort)
-        try:
-            await send_otp_email(user.email, otp_plaintext, otp_type="TRANSFER")
-        except Exception:
-            logger.exception(
-                "Failed to send transfer OTP",
-                extra={"user_id": str(user.id), "transfer_id": str(transfer.id)},
-            )
+        has_pin = bool(user.pin_hash)
+
+        # -- Only auto-send OTP if user has no PIN set
+        if not has_pin:
+            try:
+                await send_otp_email(user.email, otp_plaintext, otp_type="TRANSFER")
+            except Exception:
+                logger.exception(
+                    "Failed to send transfer OTP",
+                    extra={"user_id": str(user.id), "transfer_id": str(transfer.id)},
+                )
 
         # -- Fetch receiver name for response
         receiver_user = await self.repo.get_user_by_id(db, receiver_account.user_id)
@@ -194,6 +197,7 @@ class TransferService:
             "receiver_name": receiver_name,
             "receiver_account": self._mask_account(receiver_account.account_number),
             "amount": str(amount),
+            "has_pin": has_pin,
         }
 
     # ------------------------------------------------------------------
@@ -369,6 +373,45 @@ class TransferService:
             )
 
         await db.commit()
+
+    # ------------------------------------------------------------------
+    # Step 2 (OTP path on-demand): user requests OTP after seeing PIN tab
+    # ------------------------------------------------------------------
+
+    async def request_transfer_otp(
+        self,
+        db: AsyncSession,
+        *,
+        user: "User",
+        transfer_id: "UUID",
+    ) -> None:
+        """Send OTP email for an existing PENDING transfer (called when user picks OTP tab)."""
+        from app.common.utils.otp import generate_otp, hash_otp, send_otp_email
+
+        transfer = await self.repo.get_transfer_by_id(db, transfer_id)
+        if transfer is None:
+            raise transfer_not_found()
+
+        sender_account = await self.repo.get_account_by_user_id(db, user.id)
+        if sender_account is None or sender_account.id != transfer.sender_account_id:
+            raise transfer_not_found()
+
+        if transfer.status != "PENDING":
+            raise transfer_already_completed()
+
+        # Invalidate any existing OTP rows by creating a fresh one
+        otp_plaintext = generate_otp()
+        expires_at = datetime.utcnow() + timedelta(minutes=_OTP_TTL_MINUTES)
+        await self.repo.create_transfer_otp(
+            db,
+            user_id=user.id,
+            otp_hash=hash_otp(otp_plaintext),
+            expires_at=expires_at,
+            transfer_id=transfer.id,
+        )
+        await db.commit()
+
+        await send_otp_email(user.email, otp_plaintext, otp_type="TRANSFER")
 
     # ------------------------------------------------------------------
     # Step 2 (PIN path): confirm without OTP

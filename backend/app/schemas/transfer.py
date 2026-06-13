@@ -83,6 +83,10 @@ class TransferConfirmPinRequest(BaseModel):
     pin: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+class TransferRequestOtpRequest(BaseModel):
+    transfer_id: UUID
+
+
 class TransferConfirmResponse(BaseModel):
     success: bool
     message: str

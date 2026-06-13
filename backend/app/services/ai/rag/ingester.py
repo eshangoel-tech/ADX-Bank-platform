@@ -12,7 +12,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_CONFIG_DIR = Path(__file__).parents[4] / "config"
+_CONFIG_DIR = Path(__file__).parents[3] / "config"
 _BANK_RULES_DIR = _CONFIG_DIR / "bank_rules"
 _BANK_POLICIES_DIR = _CONFIG_DIR / "bank_policies"
 

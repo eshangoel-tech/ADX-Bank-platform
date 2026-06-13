@@ -13,6 +13,7 @@ interface InitiateResponse {
   receiver_name: string;
   receiver_account: string;
   amount: string;
+  has_pin: boolean;
 }
 
 interface Contact {
@@ -51,6 +52,10 @@ function TransferContent() {
   const [amount, setAmount] = useState("");
   const [initData, setInitData] = useState<InitiateResponse | null>(null);
   const [pin, setPin] = useState("");
+  const [otp, setOtp] = useState("");
+  const [confirmMode, setConfirmMode] = useState<"pin" | "otp">("pin");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -76,7 +81,10 @@ function TransferContent() {
       else if (method === "phone") body.to_phone = phone;
       else body.to_upi = upiId;
       const { data } = await api.post("/transfer/initiate", body);
-      setInitData(data?.data ?? data);
+      const d = data?.data ?? data;
+      setInitData(d);
+      setConfirmMode(d.has_pin ? "pin" : "otp");
+      if (!d.has_pin) setOtpSent(true); // OTP was auto-sent
       goTo("confirm", 1);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -100,10 +108,40 @@ function TransferContent() {
     }
   };
 
+  const handleSendOtp = async () => {
+    if (!initData) return;
+    setOtpLoading(true);
+    setError(null);
+    try {
+      await api.post("/transfer/request-otp", { transfer_id: initData.transfer_id });
+      setOtpSent(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleConfirmOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length < 6) { setError("Enter the 6-digit OTP."); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      await api.post("/transfer/confirm", { transfer_id: initData?.transfer_id, otp });
+      goTo("success", 1);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = () => {
     goTo("initiate", -1);
     setAccountNumber(""); setPhone(""); setUpiId(""); setAmount("");
-    setPin(""); setInitData(null); setError(null);
+    setPin(""); setOtp(""); setInitData(null); setError(null);
+    setOtpSent(false); setConfirmMode("pin");
   };
 
   const stepIndex = step === "initiate" ? 0 : step === "confirm" ? 1 : 2;
@@ -318,24 +356,89 @@ function TransferContent() {
                   <p className="text-xs leading-relaxed" style={{ color: "#fbbf24" }}>Verify recipient carefully. Transfers cannot be reversed.</p>
                 </div>
 
-                <form onSubmit={handleConfirm} className="space-y-5">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--accent)" }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
+                {/* PIN / OTP tabs — only show tabs if user has a PIN */}
+                {initData.has_pin && (
+                  <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
+                    {(["pin", "otp"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => { setConfirmMode(m); setError(null); }}
+                        className="flex-1 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer"
+                        style={{
+                          backgroundColor: confirmMode === m ? "var(--accent)" : "transparent",
+                          color: confirmMode === m ? "#fff" : "var(--text-secondary)",
+                        }}
+                      >
+                        {m === "pin" ? "Use PIN" : "Use OTP"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* PIN mode */}
+                {(confirmMode === "pin" && initData.has_pin) && (
+                  <form onSubmit={handleConfirm} className="space-y-4">
+                    <div className="space-y-3">
                       <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Enter your 6-digit ADX PIN</p>
+                      <PinInput value={pin} onChange={setPin} autoFocus />
                     </div>
-                    <PinInput value={pin} onChange={setPin} autoFocus />
-                  </div>
-                  {error && <p className="error-box">{error}</p>}
-                  <div className="flex gap-3 pt-1">
-                    <button type="button" onClick={handleReset} className="btn-secondary flex-1 cursor-pointer">← Back</button>
-                    <button type="submit" disabled={loading || pin.length < 6} className="btn-primary flex-1 cursor-pointer">
-                      {loading ? <span className="flex items-center justify-center gap-2"><Spinner size={16} />Confirming…</span> : "Confirm Transfer"}
-                    </button>
-                  </div>
-                </form>
+                    {error && <p className="error-box">{error}</p>}
+                    <div className="flex gap-3">
+                      <button type="button" onClick={handleReset} className="btn-secondary flex-1 cursor-pointer">← Back</button>
+                      <button type="submit" disabled={loading || pin.length < 6} className="btn-primary flex-1 cursor-pointer">
+                        {loading ? <span className="flex items-center justify-center gap-2"><Spinner size={16} />Confirming…</span> : "Confirm Transfer"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* OTP mode */}
+                {(confirmMode === "otp" || !initData.has_pin) && (
+                  <form onSubmit={handleConfirmOtp} className="space-y-4">
+                    {!otpSent ? (
+                      <div className="space-y-3">
+                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          An OTP will be sent to your registered email.
+                        </p>
+                        {error && <p className="error-box">{error}</p>}
+                        <div className="flex gap-3">
+                          <button type="button" onClick={handleReset} className="btn-secondary flex-1 cursor-pointer">← Back</button>
+                          <button type="button" onClick={handleSendOtp} disabled={otpLoading} className="btn-primary flex-1 cursor-pointer">
+                            {otpLoading ? <span className="flex items-center justify-center gap-2"><Spinner size={16} />Sending…</span> : "Send OTP"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          OTP sent to your email. Enter the 6-digit code below.
+                        </p>
+                        <input
+                          className="input text-center tracking-widest font-mono text-lg"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="000000"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          autoFocus
+                        />
+                        {error && <p className="error-box">{error}</p>}
+                        <div className="flex gap-3">
+                          <button type="button" onClick={handleReset} className="btn-secondary flex-1 cursor-pointer">← Back</button>
+                          <button type="submit" disabled={loading || otp.length < 6} className="btn-primary flex-1 cursor-pointer">
+                            {loading ? <span className="flex items-center justify-center gap-2"><Spinner size={16} />Confirming…</span> : "Confirm Transfer"}
+                          </button>
+                        </div>
+                        <button type="button" onClick={handleSendOtp} disabled={otpLoading}
+                          className="w-full text-xs cursor-pointer" style={{ color: "var(--accent)" }}>
+                          {otpLoading ? "Sending…" : "Resend OTP"}
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                )}
               </div>
             </motion.div>
           )}

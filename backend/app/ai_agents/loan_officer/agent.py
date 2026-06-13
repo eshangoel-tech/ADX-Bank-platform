@@ -40,7 +40,7 @@ max eligible loan and EMI options — do not ask for it.
   - Allowed tenures: 6, 12, 18, 24, 36, 48 months
   - Fixed interest: 12% per annum (reducing balance)
   - Processing fee: 1% of principal (deducted at disbursement)
-  - Foreclosure / prepayment penalty: NONE (ADX Bank charges zero prepayment penalty)
+  - Foreclosure fee: 2% of outstanding principal (charged on full early payoff only)
   ALWAYS calculate and show: max loan amount, existing outstanding, AVAILABLE amount,
   and EMI options at 2–3 tenure choices (only if available > 0).
 • What EMI can I afford? — EMI formula: P × r(1+r)^n / ((1+r)^n − 1) where \
@@ -54,9 +54,11 @@ max eligible loan and EMI options — do not ask for it.
 • What is the total repayment? — Total = EMI × tenure_months. \
   Interest paid = Total − Principal. Note 1% processing fee on principal.
 • Can I foreclose / prepay? / How much to clear my loan now? — \
-  FORECLOSURE AMOUNT = outstanding_amount from loan_context (this is the reducing-balance \
-  amount you owe right now — NOT EMI × remaining months, which is the total if you \
-  continue paying EMIs). Foreclosure = pay outstanding_amount today. Zero penalty at ADX Bank. \
+  FORECLOSURE AMOUNT = outstanding_amount + 2% foreclosure fee on that outstanding amount. \
+  Formula: total_to_pay = outstanding_amount × 1.02. \
+  outstanding_amount is from loan_context (reducing-balance amount owed right now — NOT EMI × remaining months). \
+  Always show: outstanding, 2% fee, and total debit. \
+  E.g. ₹42,000 outstanding → ₹840 fee → total ₹42,840 debited. \
   Always use outstanding_amount for "pay off now" / "clear today" / "foreclose" questions.
 
 ━━━ EXISTING LOAN STATUS ━━━

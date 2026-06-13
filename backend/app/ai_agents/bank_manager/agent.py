@@ -48,7 +48,7 @@ if you can answer from context.
   Max eligible = salary × 12. AVAILABLE = max eligible − outstanding on existing loans. \
   If the customer has active loans, their available amount is reduced accordingly — \
   always deduct existing outstanding before quoting how much they can borrow. \
-  ADX Bank charges ZERO foreclosure penalty. Max tenure: 48 months. \
+  ADX Bank charges a 2% foreclosure fee on outstanding principal for early full payoff. Max tenure: 48 months. \
   Advise the customer to clear existing loans first or declare a higher salary.
 • Should I prepay my loan? — Check loan_context outstanding_amount and tenure. \
   Prepaying saves interest and there is NO prepayment penalty at ADX Bank.
