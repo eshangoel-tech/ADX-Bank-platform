@@ -48,7 +48,7 @@ export default function RootLayout({
       className={`${outfit.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
     >
       <head>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none'><rect width='40' height='40' rx='9' fill='%230D1F3C'/><path d='M9 32 L20 10' stroke='%23D4AF37' stroke-width='4.2' stroke-linecap='round'/><path d='M20 10 L31 32' stroke='white' stroke-width='4.2' stroke-linecap='round'/><line x1='14' y1='24' x2='26' y2='24' stroke='white' stroke-width='3' stroke-linecap='round'/><line x1='29' y1='26' x2='34' y2='32' stroke='%23D4AF37' stroke-width='2.5' stroke-linecap='round'/><line x1='34' y1='26' x2='29' y2='32' stroke='%23D4AF37' stroke-width='2.5' stroke-linecap='round'/></svg>" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none'><rect width='40' height='40' rx='9' fill='%230D1F3C'/><polyline points='4,33 15,12 22,21' stroke='%23D4AF37' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='22,21 29,8 36,33' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
       </head>
       <body className="min-h-screen font-body">
         <Providers>
